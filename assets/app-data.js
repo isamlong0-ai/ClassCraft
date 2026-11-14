@@ -1,0 +1,406 @@
+/* =============================================================
+ * ClassCraft SMP - Lapisan Data (Supabase + fallback localStorage)
+ * -------------------------------------------------------------
+ * Semua akses data aplikasi melewati objek global `CC`.
+ * Jika Supabase belum dikonfigurasi (assets/supabase-config.js),
+ * otomatis memakai localStorage sehingga aplikasi tetap jalan.
+ * ============================================================= */
+(function () {
+    'use strict';
+
+    var cfg = window.CC_CONFIG || {};
+    var configured = !!(cfg.SUPABASE_URL && cfg.SUPABASE_ANON_KEY && window.supabase);
+    var sb = configured ? window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY) : null;
+
+    // Supabase Auth memakai email. Username/NIP dipetakan ke email internal.
+    var EMAIL_DOMAIN = '@classcraft.local';
+    function emailFor(username) { return String(username == null ? '' : username).trim().toLowerCase() + EMAIL_DOMAIN; }
+
+    var KEY = {
+        users: 'cc_smp_users',
+        sekolah: 'cc_smp_sekolah',
+        rombel: 'cc_smp_rombel',
+        session: 'cc_smp_session'
+    };
+
+    var DEFAULT_USERS = [
+        { username: 'admin', pass: 'admin123', role: 'admin', nama: 'Administrator Sekolah', mapel: 'Sistem', pangkat: '-', gol: '-' },
+        { username: '198001012005011001', pass: 'guru123', role: 'guru', nama: 'Budi Santoso S.Pd', mapel: 'Pendidikan Pancasila', pangkat: 'Pembina', gol: 'IV/a' }
+    ];
+
+    var DEFAULT_SEKOLAH = {
+        nama: 'SMP Negeri 1 Indonesia', npsn: '10203040',
+        kepsek: 'Dr. H. Ahmad Dahlan M.Pd', nipKepsek: '196805121992031002',
+        tahunAjaran: '2025/2026', semester: 'Ganjil', imgKop: '', imgTtd: ''
+    };
+
+    var DEFAULT_ROMBEL = [
+        { id: '7-A', tingkat: 'Kelas 7', nama: '7-A', wali: 'Budi Santoso S.Pd', siswa: [
+            { id: 'seed-1', nisn: '0081234561', nipd: '232407001', nama: 'Ahmad Dahlan', jk: 'L' },
+            { id: 'seed-2', nisn: '0081234562', nipd: '232407002', nama: 'Siti Walidah', jk: 'P' }
+        ] }
+    ];
+
+    function uid() {
+        if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
+        return 'id-' + Date.now() + '-' + Math.floor(Math.random() * 1e6);
+    }
+
+    function lsGet(key, fallback) {
+        try {
+            var raw = localStorage.getItem(key);
+            if (raw == null) return fallback;
+            return JSON.parse(raw);
+        } catch (e) { return fallback; }
+    }
+    function lsSet(key, value) {
+        try { localStorage.setItem(key, JSON.stringify(value)); } catch (e) { /* penuh / diblokir */ }
+    }
+
+    // ---------- Sesi (selalu lokal) ----------
+    function getSession() { return lsGet(KEY.session, null); }
+    function setSession(s) { lsSet(KEY.session, s); }
+    function clearSession() { try { localStorage.removeItem(KEY.session); } catch (e) {} }
+
+    // ---------- Sekolah ----------
+    function mapSekolah(row) {
+        return {
+            nama: row.nama || DEFAULT_SEKOLAH.nama,
+            npsn: row.npsn || '',
+            kepsek: row.kepsek || '',
+            nipKepsek: row.nip_kepsek || '',
+            tahunAjaran: row.tahun_ajaran || DEFAULT_SEKOLAH.tahunAjaran,
+            semester: row.semester || DEFAULT_SEKOLAH.semester,
+            imgKop: row.img_kop || '',
+            imgTtd: row.img_ttd || ''
+        };
+    }
+
+    async function getSekolah() {
+        if (sb) {
+            try {
+                var res = await sb.from('sekolah').select('*').limit(1).maybeSingle();
+                if (!res.error && res.data) {
+                    var mapped = mapSekolah(res.data);
+                    lsSet(KEY.sekolah, mapped); // simpan cache untuk mode offline
+                    return mapped;
+                }
+            } catch (e) { console.warn('Gagal memuat sekolah dari Supabase, memakai cache:', e); }
+        }
+        return lsGet(KEY.sekolah, null) || Object.assign({}, DEFAULT_SEKOLAH);
+    }
+
+    async function saveSekolah(data) {
+        lsSet(KEY.sekolah, data);
+        if (sb) {
+            var payload = {
+                nama: data.nama, npsn: data.npsn, kepsek: data.kepsek,
+                nip_kepsek: data.nipKepsek, tahun_ajaran: data.tahunAjaran,
+                semester: data.semester, img_kop: data.imgKop, img_ttd: data.imgTtd,
+                updated_at: new Date().toISOString()
+            };
+            var existing = await sb.from('sekolah').select('id').limit(1).maybeSingle();
+            if (existing.error) throw existing.error;
+            if (existing.data && existing.data.id) {
+                var upd = await sb.from('sekolah').update(payload).eq('id', existing.data.id);
+                if (upd.error) throw upd.error;
+            } else {
+                var ins = await sb.from('sekolah').insert(payload);
+                if (ins.error) throw ins.error;
+            }
+        }
+    }
+
+    // ---------- Akun guru / admin ----------
+    function seedUsersLocal() {
+        var users = lsGet(KEY.users, null);
+        if (!users) { users = DEFAULT_USERS.slice(); lsSet(KEY.users, users); }
+        return users;
+    }
+
+    async function getUsers() {
+        if (sb) {
+            try {
+                var res = await sb.from('guru').select('id,username,role,nama,mapel,pangkat,gol').order('role').order('nama');
+                if (res.error) throw res.error;
+                return res.data || [];
+            } catch (e) {
+                console.warn('Gagal memuat guru dari Supabase, memakai data lokal:', e);
+            }
+        }
+        return seedUsersLocal();
+    }
+
+    async function addUser(u) {
+        var payload = {
+            username: u.username, pass: u.pass || 'guru123', role: u.role || 'guru',
+            nama: u.nama, mapel: u.mapel || '', pangkat: u.pangkat || '-', gol: u.gol || '-'
+        };
+        if (sb) {
+            var res = await sb.rpc('admin_create_guru', {
+                p_username: payload.username, p_password: payload.pass, p_role: payload.role,
+                p_nama: payload.nama, p_mapel: payload.mapel, p_pangkat: payload.pangkat, p_gol: payload.gol
+            });
+            if (res.error) throw res.error;
+            return (res.data && res.data[0]) || payload;
+        }
+        var users = seedUsersLocal();
+        users.push(payload);
+        lsSet(KEY.users, users);
+        return payload;
+    }
+
+    async function resetPassword(username, newPass) {
+        newPass = newPass || 'guru123';
+        if (sb) {
+            var res = await sb.rpc('admin_reset_guru_password', { p_username: username, p_password: newPass });
+            if (res.error) throw res.error;
+            return;
+        }
+        var users = seedUsersLocal();
+        var idx = users.findIndex(function (x) { return x.username === username; });
+        if (idx !== -1) { users[idx].pass = newPass; lsSet(KEY.users, users); }
+    }
+
+    // Profil guru milik user yang sedang login (dipakai ulang beberapa fungsi).
+    async function fetchProfile(authUserId) {
+        var prof = await sb.from('guru')
+            .select('id,username,role,nama,mapel,pangkat,gol')
+            .eq('id', authUserId).maybeSingle();
+        if (prof.error) throw prof.error;
+        return prof.data || null;
+    }
+
+    async function login(username, password) {
+        if (sb) {
+            var res = await sb.auth.signInWithPassword({ email: emailFor(username), password: password });
+            if (res.error || !res.data || !res.data.user) return null;
+            try {
+                var prof = await fetchProfile(res.data.user.id);
+                if (!prof) { await sb.auth.signOut(); return null; }
+                return prof;
+            } catch (e) {
+                await sb.auth.signOut();
+                throw e;
+            }
+        }
+        var users = seedUsersLocal();
+        var u = users.find(function (x) { return x.username === username && x.pass === password; });
+        return u ? Object.assign({}, u) : null;
+    }
+
+    async function logout() {
+        clearSession();
+        if (sb) { try { await sb.auth.signOut(); } catch (e) { /* abaikan */ } }
+    }
+
+    // Ambil user yang benar-benar terautentikasi (validasi sesi Supabase).
+    async function getAuthUser() {
+        if (!sb) return getSession();
+        try {
+            var res = await sb.auth.getSession();
+            if (!res.data || !res.data.session) { clearSession(); return null; }
+            var prof = await fetchProfile(res.data.session.user.id);
+            if (prof) setSession(prof);
+            return prof;
+        } catch (e) {
+            console.warn('Gagal memverifikasi sesi:', e);
+            return null;
+        }
+    }
+
+    // Guard untuk halaman: pastikan login dan (opsional) peran sesuai.
+    async function requireAuth(role) {
+        var u = await getAuthUser();
+        if (!u) return null;
+        if (role && u.role !== role) return null;
+        return u;
+    }
+
+    async function changePassword(username, oldPass, newPass) {
+        if (sb) {
+            // Verifikasi password lama dengan login ulang, lalu perbarui.
+            var check = await sb.auth.signInWithPassword({ email: emailFor(username), password: oldPass });
+            if (check.error) return false;
+            var upd = await sb.auth.updateUser({ password: newPass });
+            if (upd.error) throw upd.error;
+            return true;
+        }
+        var users = seedUsersLocal();
+        var idx = users.findIndex(function (x) { return x.username === username; });
+        if (idx === -1 || users[idx].pass !== oldPass) return false;
+        users[idx].pass = newPass;
+        lsSet(KEY.users, users);
+        return true;
+    }
+
+    // ---------- Rombel & siswa ----------
+    function normalizeSiswa(s) {
+        return {
+            id: s.id || uid(),
+            nisn: s.nisn, nipd: s.nipd || '-', nama: s.nama,
+            jk: (s.jk || 'L').toUpperCase() === 'P' ? 'P' : 'L'
+        };
+    }
+
+    async function getRombel() {
+        if (sb) {
+            try {
+                var res = await sb.from('rombel')
+                    .select('id,tingkat,nama,wali_id,siswa(id,nisn,nipd,nama,jk)')
+                    .order('nama');
+                if (res.error) throw res.error;
+                var guruRes = await sb.from('guru').select('id,nama');
+                var map = {};
+                (guruRes.data || []).forEach(function (g) { map[g.id] = g.nama; });
+                var mapped = (res.data || []).map(function (r) {
+                    return {
+                        id: r.id, tingkat: r.tingkat, nama: r.nama,
+                        wali: r.wali_id ? (map[r.wali_id] || '-') : '-',
+                        siswa: (r.siswa || []).map(function (s) { return normalizeSiswa(s); })
+                    };
+                });
+                lsSet(KEY.rombel, mapped); // simpan cache untuk mode offline
+                return mapped;
+            } catch (e) {
+                console.warn('Gagal memuat rombel dari Supabase, memakai cache:', e);
+            }
+        }
+        var rombel = lsGet(KEY.rombel, null) || DEFAULT_ROMBEL.slice();
+        rombel.forEach(function (r) { r.siswa = (r.siswa || []).map(normalizeSiswa); });
+        return rombel;
+    }
+
+    async function addRombel(data) {
+        if (sb) {
+            var waliId = null;
+            if (data.wali && data.wali !== '-') {
+                var g = await sb.from('guru').select('id').eq('nama', data.wali).maybeSingle();
+                if (!g.error && g.data) waliId = g.data.id;
+            }
+            var res = await sb.from('rombel').insert({ tingkat: data.tingkat, nama: data.nama, wali_id: waliId }).select().single();
+            if (res.error) throw res.error;
+            return { id: res.data.id, tingkat: res.data.tingkat, nama: res.data.nama, wali: data.wali || '-', siswa: [] };
+        }
+        var rombel = await getRombel();
+        rombel.push({ id: data.nama, tingkat: data.tingkat, nama: data.nama, wali: data.wali || '-', siswa: [] });
+        lsSet(KEY.rombel, rombel);
+        return rombel[rombel.length - 1];
+    }
+
+    async function addSiswa(rombelId, siswa) {
+        var row = normalizeSiswa(siswa);
+        if (sb) {
+            var res = await sb.from('siswa')
+                .insert({ rombel_id: rombelId, nisn: row.nisn, nipd: row.nipd, nama: row.nama, jk: row.jk })
+                .select().single();
+            if (res.error) throw res.error;
+            return normalizeSiswa(res.data);
+        }
+        var rombel = lsGet(KEY.rombel, null) || DEFAULT_ROMBEL.slice();
+        var target = rombel.find(function (r) { return r.id === rombelId; });
+        if (!target) throw new Error('Rombel tidak ditemukan');
+        target.siswa = (target.siswa || []).map(normalizeSiswa);
+        target.siswa.push(row);
+        lsSet(KEY.rombel, rombel);
+        return row;
+    }
+
+    async function importSiswa(rombelId, rows) {
+        if (rows.length === 0) return 0;
+        if (sb) {
+            var payload = rows.map(function (r) {
+                var s = normalizeSiswa(r);
+                return { rombel_id: rombelId, nisn: s.nisn, nipd: s.nipd, nama: s.nama, jk: s.jk };
+            });
+            var res = await sb.from('siswa').insert(payload).select();
+            if (res.error) throw res.error;
+            return (res.data || []).length;
+        }
+        var rombel = lsGet(KEY.rombel, null) || DEFAULT_ROMBEL.slice();
+        var target = rombel.find(function (r) { return r.id === rombelId; });
+        if (!target) throw new Error('Rombel tidak ditemukan');
+        target.siswa = (target.siswa || []).map(normalizeSiswa);
+        rows.forEach(function (r) { target.siswa.push(normalizeSiswa(r)); });
+        lsSet(KEY.rombel, rombel);
+        return rows.length;
+    }
+
+    async function deleteSiswa(siswaId) {
+        if (sb) {
+            var res = await sb.from('siswa').delete().eq('id', siswaId);
+            if (res.error) throw res.error;
+            return;
+        }
+        var rombel = lsGet(KEY.rombel, null) || DEFAULT_ROMBEL.slice();
+        rombel.forEach(function (r) {
+            r.siswa = (r.siswa || []).filter(function (s) { return (s.id || '') !== siswaId; });
+        });
+        lsSet(KEY.rombel, rombel);
+    }
+
+    // ---------- Backup / Restore ----------
+    async function exportAll() {
+        var users = await getUsers();
+        var sekolah = await getSekolah();
+        var rombel = await getRombel();
+        return { users: users, sekolah: sekolah, rombel: rombel, exportedAt: new Date().toISOString() };
+    }
+
+    async function restoreAll(data) {
+        if (!data) return;
+        if (data.sekolah) { await saveSekolah(data.sekolah); }
+        if (Array.isArray(data.users)) {
+            if (!sb) { lsSet(KEY.users, data.users); }
+            else {
+                for (var i = 0; i < data.users.length; i++) {
+                    var u = data.users[i];
+                    var existing = await sb.from('guru').select('id').eq('username', u.username).maybeSingle();
+                    if (!existing.error && !existing.data) {
+                        await addUser(u);
+                    }
+                }
+            }
+        }
+        if (Array.isArray(data.rombel) && !sb) {
+            lsSet(KEY.rombel, data.rombel);
+        }
+    }
+
+    // Revalidasi sesi terpusat: jika token Supabase tidak valid, paksa ke login.
+    if (sb) {
+        (function () {
+            var path = (window.location.pathname || '').toLowerCase();
+            if (path.indexOf('login.html') !== -1) return;
+            getAuthUser().then(function (u) {
+                if (!u) window.location.replace('login.html');
+            });
+        })();
+    }
+
+    window.CC = {
+        isConfigured: function () { return configured; },
+        homeFor: function (role) { return role === 'admin' ? 'admin-profil.html' : 'guru-dashboard.html'; },
+        getSession: getSession,
+        setSession: setSession,
+        clearSession: clearSession,
+        login: login,
+        logout: logout,
+        getAuthUser: getAuthUser,
+        requireAuth: requireAuth,
+        changePassword: changePassword,
+        resetPassword: resetPassword,
+        getSekolah: getSekolah,
+        saveSekolah: saveSekolah,
+        getUsers: getUsers,
+        addUser: addUser,
+        getRombel: getRombel,
+        addRombel: addRombel,
+        addSiswa: addSiswa,
+        importSiswa: importSiswa,
+        deleteSiswa: deleteSiswa,
+        exportAll: exportAll,
+        restoreAll: restoreAll,
+        defaults: { users: DEFAULT_USERS, sekolah: DEFAULT_SEKOLAH, rombel: DEFAULT_ROMBEL }
+    };
+})();

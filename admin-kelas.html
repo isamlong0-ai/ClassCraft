@@ -6,16 +6,19 @@
     <title>Admin - Kelola Kelas & Siswa</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="assets/supabase-config.js"></script>
+    <script src="assets/app-data.js"></script>
 </head>
 <body class="bg-slate-100 font-sans text-slate-800 min-h-screen flex flex-col">
 
     <header class="bg-indigo-700 text-white shadow-lg sticky top-0 z-50">
-        <div class="max-w-7xl mx-auto px-4 py-3 flex justify-between items-center">
+        <div class="max-w-7xl mx-auto px-4 py-3 flex flex-wrap justify-between items-center gap-2">
             <div class="flex items-center space-x-3">
                 <i class="fas fa-shapes text-2xl text-amber-300"></i>
                 <h1 class="text-lg font-bold" id="header-sekolah">ClassCraft Admin</h1>
             </div>
-            <nav class="flex gap-2 text-xs font-medium">
+            <nav class="flex flex-wrap justify-end gap-1 sm:gap-2 text-xs font-medium">
                 <a href="admin-profil.html" class="hover:bg-indigo-600 px-3 py-2 rounded-lg transition"><i class="fas fa-school mr-1"></i> Profil Sekolah</a>
                 <a href="admin-guru.html" class="hover:bg-indigo-600 px-3 py-2 rounded-lg transition"><i class="fas fa-users-cog mr-1"></i> Data Guru</a>
                 <a href="admin-kelas.html" class="bg-indigo-900 px-3 py-2 rounded-lg"><i class="fas fa-door-open mr-1"></i> Kelola Kelas</a>
@@ -89,63 +92,84 @@
     </main>
 
     <script>
-        let session = null;
-        try { session = JSON.parse(localStorage.getItem('cc_smp_session')); } catch (e) {}
+        let session = CC.getSession();
 
         if (!session || session.role !== 'admin') {
-            session = { username: 'admin', pass: 'admin123', role: 'admin', nama: 'Administrator Sekolah' };
-            try { localStorage.setItem('cc_smp_session', JSON.stringify(session)); } catch (e) {}
+            window.location.replace('login.html');
+            throw new Error('Akses ditolak: silakan login sebagai admin.');
         }
 
-        let dbUsers = JSON.parse(localStorage.getItem('cc_smp_users')) || [];
-        let dbSekolah = JSON.parse(localStorage.getItem('cc_smp_sekolah')) || { nama: 'SMP Negeri 1 Indonesia' };
-        let dbRombel = JSON.parse(localStorage.getItem('cc_smp_rombel')) || [
-            { id: '7-A', tingkat: 'Kelas 7', nama: '7-A', wali: 'Budi Santoso S.Pd', siswa: [
-                { nisn: '0081234561', nipd: '232407001', nama: 'Ahmad Dahlan', jk: 'L' },
-                { nisn: '0081234562', nipd: '232407002', nama: 'Siti Walidah', jk: 'P' }
-            ]}
-        ];
+        let dbUsers = [];
+        let dbSekolah = Object.assign({}, CC.defaults.sekolah);
+        let dbRombel = [];
 
-        document.addEventListener('DOMContentLoaded', () => {
+        document.addEventListener('DOMContentLoaded', async () => {
+            try {
+                const hasil = await Promise.all([CC.getUsers(), CC.getSekolah(), CC.getRombel()]);
+                dbUsers = hasil[0];
+                dbSekolah = hasil[1];
+                dbRombel = hasil[2];
+            } catch (e) {
+                console.error('Gagal memuat data:', e);
+                alert('Gagal memuat data dari server. Menampilkan data tersimpan.');
+            }
             document.getElementById('header-sekolah').innerText = dbSekolah.nama;
             loadWaliList();
             renderRombel();
         });
 
+        function escapeHtml(value) {
+            return String(value == null ? '' : value)
+                .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+        }
+
         function loadWaliList() {
             const listGuru = dbUsers.filter(u => u.role === 'guru');
             const select = document.querySelector('.select-guru');
             select.innerHTML = `<option value="-">-- Pilih Wali Kelas --</option>`;
-            listGuru.forEach(g => { select.innerHTML += `<option value="${g.nama}">${g.nama}</option>`; });
+            listGuru.forEach(g => { select.innerHTML += `<option value="${escapeHtml(g.nama)}">${escapeHtml(g.nama)}</option>`; });
         }
 
         function renderRombel() {
             const cardContainer = document.getElementById('list-rombel');
             const selectActive = document.getElementById('select-active-rombel');
+            // Simpan pilihan kelas yang sedang aktif agar tidak ter-reset ke kelas pertama.
+            const prevActive = selectActive.value;
             cardContainer.innerHTML = ''; selectActive.innerHTML = '';
 
             dbRombel.forEach(r => {
                 cardContainer.innerHTML += `<div class="p-2 bg-slate-50 border rounded text-xs flex justify-between">
-                    <div><b>${r.nama}</b> <span class="text-[10px] text-slate-500">(${r.tingkat})</span></div>
+                    <div><b>${escapeHtml(r.nama)}</b> <span class="text-[10px] text-slate-500">(${escapeHtml(r.tingkat)})</span></div>
                     <span class="bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded text-[10px] font-bold">${r.siswa.length} Siswa</span>
                 </div>`;
-                selectActive.innerHTML += `<option value="${r.id}">Kelas ${r.nama}</option>`;
+                selectActive.innerHTML += `<option value="${escapeHtml(r.id)}">Kelas ${escapeHtml(r.nama)}</option>`;
             });
+
+            if (prevActive && dbRombel.some(r => r.id === prevActive)) {
+                selectActive.value = prevActive;
+            }
             renderSiswa();
         }
 
-        function tambahRombel(e) {
+        async function tambahRombel(e) {
             e.preventDefault();
             const nama = document.getElementById('add-nama-rombel').value.trim();
             if(dbRombel.find(r => r.nama === nama)) return alert('Nama kelas sudah ada!');
 
-            dbRombel.push({
-                id: nama, tingkat: document.getElementById('add-tingkat').value,
-                nama: nama, wali: document.getElementById('add-wali').value, siswa: []
-            });
-            localStorage.setItem('cc_smp_rombel', JSON.stringify(dbRombel));
-            renderRombel();
-            document.getElementById('add-nama-rombel').value = '';
+            try {
+                const baru = await CC.addRombel({
+                    tingkat: document.getElementById('add-tingkat').value,
+                    nama: nama,
+                    wali: document.getElementById('add-wali').value
+                });
+                dbRombel.push(baru);
+                renderRombel();
+                document.getElementById('add-nama-rombel').value = '';
+            } catch (err) {
+                console.error(err);
+                alert('Gagal menyimpan rombel: ' + (err.message || err));
+            }
         }
 
         function renderSiswa() {
@@ -155,54 +179,81 @@
             if (!rombel || rombel.siswa.length === 0) {
                 tbody.innerHTML = `<tr><td colspan="6" class="text-center p-3 text-slate-400">Belum ada siswa</td></tr>`; return;
             }
+            const rombelIndex = dbRombel.indexOf(rombel);
             rombel.siswa.forEach((s, idx) => {
                 tbody.innerHTML += `<tr>
-                    <td class="p-2">${idx+1}</td><td class="p-2 font-mono">${s.nisn}</td><td class="p-2 font-mono">${s.nipd || '-'}</td>
-                    <td class="p-2 font-medium">${s.nama}</td><td class="p-2 text-center">${s.jk}</td>
-                    <td class="p-2 text-center"><button onclick="hapusSiswa('${activeId}',${idx})" class="text-red-500"><i class="fas fa-trash"></i></button></td>
+                    <td class="p-2">${idx+1}</td><td class="p-2 font-mono">${escapeHtml(s.nisn)}</td><td class="p-2 font-mono">${escapeHtml(s.nipd || '-')}</td>
+                    <td class="p-2 font-medium">${escapeHtml(s.nama)}</td><td class="p-2 text-center">${escapeHtml(s.jk)}</td>
+                    <td class="p-2 text-center"><button onclick="hapusSiswa(${rombelIndex},${idx})" class="text-red-500 hover:text-red-700 transition"><i class="fas fa-trash"></i></button></td>
                 </tr>`;
             });
         }
 
-        function tambahSiswa(e) {
+        async function tambahSiswa(e) {
             e.preventDefault();
             const activeId = document.getElementById('select-active-rombel').value;
             const rombel = dbRombel.find(r => r.id === activeId);
-            if (rombel) {
-                rombel.siswa.push({
+            if (!rombel) return alert('Pilih kelas terlebih dahulu.');
+
+            try {
+                const dibuat = await CC.addSiswa(activeId, {
                     nisn: document.getElementById('add-nisn').value.trim(),
                     nipd: document.getElementById('add-nipd').value.trim() || '-',
                     nama: document.getElementById('add-nama-siswa').value.trim(),
                     jk: document.getElementById('add-jk').value
                 });
-                localStorage.setItem('cc_smp_rombel', JSON.stringify(dbRombel));
+                rombel.siswa.push(dibuat);
                 renderRombel();
                 document.getElementById('add-nisn').value = ''; document.getElementById('add-nipd').value = ''; document.getElementById('add-nama-siswa').value = '';
+            } catch (err) {
+                console.error(err);
+                alert('Gagal menambah siswa: ' + (err.message || err));
             }
         }
 
-        function importSiswa() {
+        async function importSiswa() {
             const activeId = document.getElementById('select-active-rombel').value;
             const raw = document.getElementById('import-siswa').value.trim();
             const rombel = dbRombel.find(r => r.id === activeId);
-            if (rombel && raw) {
-                raw.split('\n').forEach(line => {
-                    const parts = line.split(',').map(s => s.trim());
-                    if (parts.length >= 3) {
-                        const [nisn, nipd, nama, jk = 'L'] = parts.length >= 4 ? parts : [parts[0], '-', parts[1], parts[2]];
-                        rombel.siswa.push({ nisn, nipd, nama, jk: jk.toUpperCase() });
-                    }
-                });
-                localStorage.setItem('cc_smp_rombel', JSON.stringify(dbRombel));
-                renderRombel(); document.getElementById('import-siswa').value = '';
+            if (!rombel) return alert('Pilih kelas terlebih dahulu.');
+            if (!raw) return alert('Isi data terlebih dahulu.');
+
+            const rows = [];
+            raw.split('\n').forEach(line => {
+                const parts = line.split(',').map(s => s.trim());
+                if (parts.length >= 3) {
+                    const [nisn, nipd, nama, jk = 'L'] = parts.length >= 4 ? parts : [parts[0], '-', parts[1], parts[2]];
+                    rows.push({ nisn, nipd, nama, jk: jk.toUpperCase() });
+                }
+            });
+
+            if (rows.length === 0) return alert('Tidak ada baris valid untuk diimpor.');
+
+            try {
+                await CC.importSiswa(activeId, rows);
+                const terbaru = await CC.getRombel();
+                dbRombel = terbaru;
+                renderRombel();
+                document.getElementById('import-siswa').value = '';
+                alert(`${rows.length} siswa berhasil diimpor.`);
+            } catch (err) {
+                console.error(err);
+                alert('Gagal impor siswa: ' + (err.message || err));
             }
         }
 
-        function hapusSiswa(rombelId, idx) {
-            const rombel = dbRombel.find(r => r.id === rombelId);
-            if (rombel && confirm('Hapus siswa ini?')) {
+        async function hapusSiswa(rombelIndex, idx) {
+            const rombel = dbRombel[rombelIndex];
+            if (!rombel || !rombel.siswa[idx]) return;
+            if (!confirm('Hapus siswa ini?')) return;
+            const siswa = rombel.siswa[idx];
+            try {
+                await CC.deleteSiswa(siswa.id);
                 rombel.siswa.splice(idx, 1);
-                localStorage.setItem('cc_smp_rombel', JSON.stringify(dbRombel)); renderRombel();
+                renderRombel();
+            } catch (err) {
+                console.error(err);
+                alert('Gagal menghapus siswa: ' + (err.message || err));
             }
         }
 
@@ -214,7 +265,7 @@
             rombel.siswa.forEach((s, idx) => { table += `<tr><td>${idx+1}</td><td>'${s.nisn}</td><td>'${s.nipd}</td><td>${s.nama}</td><td>${s.jk}</td></tr>`; }); table += `</table>`; const blob = new Blob(['\ufeff' + table], { type: 'application/vnd.ms-excel' }); const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `Siswa_${rombel.nama}.xls`; a.click();
         }
 
-        function logout() { localStorage.removeItem('cc_smp_session'); window.location.href = 'login.html'; }
+        function logout() { CC.logout().finally(() => { window.location.href = 'login.html'; }); }
     </script>
 </body>
 </html>

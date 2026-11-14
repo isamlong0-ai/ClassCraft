@@ -6,16 +6,19 @@
     <title>Guru - Dashboard Utama</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="assets/supabase-config.js"></script>
+    <script src="assets/app-data.js"></script>
 </head>
 <body class="bg-slate-100 font-sans text-slate-800 min-h-screen flex flex-col">
 
     <header class="bg-indigo-700 text-white shadow-lg sticky top-0 z-50">
-        <div class="max-w-7xl mx-auto px-4 py-3 flex justify-between items-center">
+        <div class="max-w-7xl mx-auto px-4 py-3 flex flex-wrap justify-between items-center gap-2">
             <div class="flex items-center space-x-3">
                 <i class="fas fa-shapes text-2xl text-amber-300"></i>
                 <h1 class="text-lg font-bold" id="header-sekolah">ClassCraft Guru</h1>
             </div>
-            <nav class="flex gap-2 text-xs font-medium">
+            <nav class="flex flex-wrap justify-end gap-1 sm:gap-2 text-xs font-medium">
                 <a href="guru-dashboard.html" class="bg-indigo-900 px-3 py-2 rounded-lg"><i class="fas fa-user-circle mr-1"></i> Informasi Saya</a>
                 <a href="guru-rpp.html" class="hover:bg-indigo-600 px-3 py-2 rounded-lg transition"><i class="fas fa-file-alt mr-1"></i> Modul Ajar / RPP</a>
                 <button onclick="logout()" class="bg-red-500 hover:bg-red-600 text-white px-3 py-2 rounded-lg transition"><i class="fas fa-sign-out-alt"></i> Keluar</button>
@@ -55,44 +58,51 @@
     </main>
 
     <script>
-        let session = null;
-        try { session = JSON.parse(localStorage.getItem('cc_smp_session')); } catch (e) {}
+        let session = CC.getSession();
 
         if (!session || session.role !== 'guru') {
-            session = { username: '198001012005011001', pass: 'guru123', role: 'guru', nama: 'Budi Santoso S.Pd', mapel: 'Pendidikan Pancasila', pangkat: 'Pembina', gol: 'IV/a' };
-            try { localStorage.setItem('cc_smp_session', JSON.stringify(session)); } catch (e) {}
+            window.location.replace('login.html');
+            throw new Error('Akses ditolak: silakan login sebagai guru.');
         }
 
-        let dbSekolah = JSON.parse(localStorage.getItem('cc_smp_sekolah')) || { nama: 'SMP Negeri 1 Indonesia' };
+        let dbSekolah = Object.assign({}, CC.defaults.sekolah);
 
-        document.addEventListener('DOMContentLoaded', () => {
+        document.addEventListener('DOMContentLoaded', async () => {
+            try {
+                dbSekolah = await CC.getSekolah();
+            } catch (e) {
+                console.error('Gagal memuat profil sekolah:', e);
+            }
             document.getElementById('header-sekolah').innerText = dbSekolah.nama;
             document.getElementById('disp-nama').innerText = session.nama;
-            document.getElementById('disp-mapel').innerText = `Mata Pelajaran Utama: ${session.mapel}`;
+            document.getElementById('disp-mapel').innerText = `Mata Pelajaran Utama: ${session.mapel || '-'}`;
             document.getElementById('disp-nip').innerText = `NIP: ${session.username}`;
             document.getElementById('disp-pangkat').innerText = `Pangkat / Golongan: ${session.pangkat || '-'} / ${session.gol || '-'}`;
         });
 
-        function gantiPassword(e) {
+        async function gantiPassword(e) {
             e.preventDefault();
             const passLama = document.getElementById('pass-lama').value;
             const passBaru = document.getElementById('pass-baru').value;
 
-            if (session.pass !== passLama) return alert('Password lama salah!');
+            if (passBaru.length < 5) return alert('Password baru minimal 5 karakter!');
 
-            let dbUsers = JSON.parse(localStorage.getItem('cc_smp_users')) || [];
-            const idx = dbUsers.findIndex(u => u.username === session.username);
-            if (idx !== -1) {
-                dbUsers[idx].pass = passBaru;
+            try {
+                const ok = await CC.changePassword(session.username, passLama, passBaru);
+                if (!ok) return alert('Password lama salah!');
+
                 session.pass = passBaru;
-                localStorage.setItem('cc_smp_users', JSON.stringify(dbUsers));
-                localStorage.setItem('cc_smp_session', JSON.stringify(session));
+                CC.setSession(session);
+                document.getElementById('pass-lama').value = '';
+                document.getElementById('pass-baru').value = '';
                 alert('Password Anda berhasil diubah!');
-                location.reload();
+            } catch (err) {
+                console.error(err);
+                alert('Gagal mengubah password: ' + (err.message || err));
             }
         }
 
-        function logout() { localStorage.removeItem('cc_smp_session'); window.location.href = 'login.html'; }
+        function logout() { CC.logout().finally(() => { window.location.href = 'login.html'; }); }
     </script>
 </body>
 </html>

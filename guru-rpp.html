@@ -6,17 +6,20 @@
     <title>Guru - ATP & Modul Ajar RPP Generator</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="assets/supabase-config.js"></script>
+    <script src="assets/app-data.js"></script>
 </head>
 <body class="bg-slate-100 font-sans text-slate-800 min-h-screen flex flex-col">
 
     <!-- Header Topbar -->
     <header class="bg-indigo-700 text-white shadow-lg sticky top-0 z-50">
-        <div class="max-w-7xl mx-auto px-4 py-3 flex justify-between items-center">
+        <div class="max-w-7xl mx-auto px-4 py-3 flex flex-wrap justify-between items-center gap-2">
             <div class="flex items-center space-x-3">
                 <i class="fas fa-shapes text-2xl text-amber-300"></i>
                 <h1 class="text-lg font-bold" id="header-sekolah">ClassCraft Guru</h1>
             </div>
-            <nav class="flex gap-2 text-xs font-medium">
+            <nav class="flex flex-wrap justify-end gap-1 sm:gap-2 text-xs font-medium">
                 <a href="guru-dashboard.html" class="hover:bg-indigo-600 px-3 py-2 rounded-lg transition"><i class="fas fa-user-circle mr-1"></i> Informasi Saya</a>
                 <a href="guru-rpp.html" class="bg-indigo-900 px-3 py-2 rounded-lg"><i class="fas fa-file-alt mr-1"></i> ATP & Modul Ajar</a>
                 <button onclick="logout()" class="bg-red-500 hover:bg-red-600 text-white px-3 py-2 rounded-lg transition"><i class="fas fa-sign-out-alt"></i> Keluar</button>
@@ -130,25 +133,40 @@
 
     <!-- Script Logika Ekstraksi & Generator -->
     <script>
-        let session = null;
-        try { session = JSON.parse(localStorage.getItem('cc_smp_session')); } catch (e) {}
+        let session = CC.getSession();
 
         if (!session || session.role !== 'guru') {
-            session = { username: '198001012005011001', pass: 'guru123', role: 'guru', nama: 'Budi Santoso S.Pd', mapel: 'Pendidikan Pancasila', pangkat: 'Pembina', gol: 'IV/a' };
-            try { localStorage.setItem('cc_smp_session', JSON.stringify(session)); } catch (e) {}
+            window.location.replace('login.html');
+            throw new Error('Akses ditolak: silakan login sebagai guru.');
         }
 
-        let dbSekolah = JSON.parse(localStorage.getItem('cc_smp_sekolah')) || { nama: 'SMP Negeri 1 Indonesia', kepsek: 'Dr. H. Ahmad Dahlan M.Pd', nipKepsek: '196805121992031002' };
-        let dbRombel = JSON.parse(localStorage.getItem('cc_smp_rombel')) || [
-            { id: '7-A', tingkat: 'Kelas 7', nama: '7-A', wali: 'Budi Santoso S.Pd', siswa: [] },
-            { id: '8-A', tingkat: 'Kelas 8', nama: '8-A', wali: '-', siswa: [] }
-        ];
+        let dbSekolah = Object.assign({}, CC.defaults.sekolah);
+        let dbRombel = [];
 
-        document.addEventListener('DOMContentLoaded', () => {
+        function escapeHtml(value) {
+            return String(value == null ? '' : value)
+                .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+        }
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            try {
+                const hasil = await Promise.all([CC.getSekolah(), CC.getRombel()]);
+                dbSekolah = hasil[0];
+                dbRombel = hasil[1];
+            } catch (e) {
+                console.error('Gagal memuat data:', e);
+                alert('Gagal memuat data dari server. Menampilkan data tersimpan.');
+            }
+
             document.getElementById('header-sekolah').innerText = dbSekolah.nama;
             const sel = document.getElementById('cfg-rombel');
             sel.innerHTML = '';
-            dbRombel.forEach(r => { sel.innerHTML += `<option value="${r.nama}">${r.tingkat} - Kelas ${r.nama}</option>`; });
+            if (dbRombel.length === 0) {
+                sel.innerHTML = `<option value="">Belum ada kelas</option>`;
+            } else {
+                dbRombel.forEach(r => { sel.innerHTML += `<option value="${escapeHtml(r.nama)}">${escapeHtml(r.tingkat)} - Kelas ${escapeHtml(r.nama)}</option>`; });
+            }
         });
 
         // Membaca file lokal jika diunggah
@@ -170,7 +188,7 @@
 ELEMEN 1: SEJARAH DAN KELAHIRAN PANCASILA
 Peserta didik mampu menganalisis kronologi sejarah kelahiran Pancasila, menjelaskan fungsi dan kedudukan Pancasila sebagai dasar negara, pandangan hidup bangsa, serta ideologi negara.
 
-ELEMEN 2: NORMAM DAN UNDANG-UNDANG DASAR 1945
+ELEMEN 2: NORMA DAN UNDANG-UNDANG DASAR 1945
 Peserta didik mampu mengidentifikasi keberagaman norma di masyarakat, menganalisis hak dan kewajiban warga negara, serta memahami hirarki peraturan perundang-undangan Indonesia.
 
 ELEMEN 3: BHINNEKA TUNGGAL IKA DAN NKRI
@@ -278,11 +296,11 @@ Peserta didik mampu menginisiasi kegiatan bersama dalam merawat keberagaman suku
                     totalJP += 4;
                     tableRows += `
                         <tr>
-                            <td class="p-2 border font-bold text-center">${tp.kode}</td>
-                            <td class="p-2 border font-semibold">${idx === 0 ? el.nama : ''}</td>
-                            <td class="p-2 border">${tp.deskripsi}</td>
-                            <td class="p-2 border text-center font-bold">${tp.jp}</td>
-                            <td class="p-2 border">${tp.p3}</td>
+                            <td class="p-2 border font-bold text-center">${escapeHtml(tp.kode)}</td>
+                            <td class="p-2 border font-semibold">${idx === 0 ? escapeHtml(el.nama) : ''}</td>
+                            <td class="p-2 border">${escapeHtml(tp.deskripsi)}</td>
+                            <td class="p-2 border text-center font-bold">${escapeHtml(tp.jp)}</td>
+                            <td class="p-2 border">${escapeHtml(tp.p3)}</td>
                         </tr>
                     `;
                 });
@@ -292,7 +310,7 @@ Peserta didik mampu menginisiasi kegiatan bersama dalam merawat keberagaman suku
                 ${kopHtml}
                 <div class="text-center font-bold mb-4">
                     <h2 class="text-sm uppercase text-indigo-900">ALUR TUJUAN PEMBELAJARAN (ATP) KURIKULUM MERDEKA</h2>
-                    <p class="text-xs font-normal">Mata Pelajaran: <b>${session.mapel}</b> | Fase D (${rombel.tingkat}) | ${semester}</p>
+                    <p class="text-xs font-normal">Mata Pelajaran: <b>${escapeHtml(session.mapel)}</b> | Fase D (${escapeHtml(rombel.tingkat)}) | ${escapeHtml(semester)}</p>
                 </div>
 
                 <table class="w-full text-xs border-collapse border border-slate-300 mb-4">
@@ -333,21 +351,21 @@ Peserta didik mampu menginisiasi kegiatan bersama dalam merawat keberagaman suku
                     modulSection += `
                         <div class="border border-slate-300 rounded-lg p-4 space-y-3 bg-slate-50/50">
                             <div class="border-b pb-2 flex justify-between items-center">
-                                <h4 class="font-bold text-indigo-800 uppercase text-xs"><i class="fas fa-bookmark mr-1"></i> Modul Ajar: ${tp.kode} - ${el.nama}</h4>
-                                <span class="bg-indigo-100 text-indigo-700 font-bold px-2 py-0.5 rounded text-[10px]">${waktu}</span>
+                                <h4 class="font-bold text-indigo-800 uppercase text-xs"><i class="fas fa-bookmark mr-1"></i> Modul Ajar: ${escapeHtml(tp.kode)} - ${escapeHtml(el.nama)}</h4>
+                                <span class="bg-indigo-100 text-indigo-700 font-bold px-2 py-0.5 rounded text-[10px]">${escapeHtml(waktu)}</span>
                             </div>
 
                             <table class="w-full text-xs border-collapse border bg-white">
-                                <tr><td class="p-1.5 border font-semibold w-1/3">Elemen Pembelajaran</td><td class="p-1.5 border">${el.nama}</td></tr>
-                                <tr><td class="p-1.5 border font-semibold">Tujuan Pembelajaran (TP)</td><td class="p-1.5 border">${tp.deskripsi}</td></tr>
-                                <tr><td class="p-1.5 border font-semibold">Model Pembelajaran</td><td class="p-1.5 border">${model}</td></tr>
-                                <tr><td class="p-1.5 border font-semibold">Dimensi P3</td><td class="p-1.5 border">${tp.p3}</td></tr>
+                                <tr><td class="p-1.5 border font-semibold w-1/3">Elemen Pembelajaran</td><td class="p-1.5 border">${escapeHtml(el.nama)}</td></tr>
+                                <tr><td class="p-1.5 border font-semibold">Tujuan Pembelajaran (TP)</td><td class="p-1.5 border">${escapeHtml(tp.deskripsi)}</td></tr>
+                                <tr><td class="p-1.5 border font-semibold">Model Pembelajaran</td><td class="p-1.5 border">${escapeHtml(model)}</td></tr>
+                                <tr><td class="p-1.5 border font-semibold">Dimensi P3</td><td class="p-1.5 border">${escapeHtml(tp.p3)}</td></tr>
                             </table>
 
                             <div class="bg-white p-3 border rounded text-xs space-y-1.5">
                                 <p class="font-bold text-slate-700">Rincian Kegiatan Pembelajaran:</p>
                                 <p><b>1. Pendahuluan (10 Menit):</b> Guru membuka KBM dengan berdoa, menyapa siswa, serta menyampaikan TP dan relevansinya.</p>
-                                <p><b>2. Kegiatan Inti (60 Menit):</b> Menggunakan sintaks ${model}, siswa menganalisis materi ${el.nama}, berdiskusi kelompok, dan menyajikan hasil kinerjanya.</p>
+                                <p><b>2. Kegiatan Inti (60 Menit):</b> Menggunakan sintaks ${escapeHtml(model)}, siswa menganalisis materi ${escapeHtml(el.nama)}, berdiskusi kelompok, dan menyajikan hasil kinerjanya.</p>
                                 <p><b>3. Penutup (10 Menit):</b> Refleksi bersama, kesimpulan materi, dan penutupan dengan doa.</p>
                             </div>
                         </div>
@@ -359,7 +377,7 @@ Peserta didik mampu menginisiasi kegiatan bersama dalam merawat keberagaman suku
                 ${kopHtml}
                 <div class="text-center font-bold mb-4">
                     <h2 class="text-sm uppercase text-indigo-900">PERANGKAT MODUL AJAR / RPP UTUH SEKALIGUS</h2>
-                    <p class="text-xs font-normal">Penyusun: <b>${session.nama}</b> (NIP: ${session.username}) | Mapel: <b>${session.mapel}</b> | ${rombel.tingkat} (${rombel.nama})</p>
+                    <p class="text-xs font-normal">Penyusun: <b>${escapeHtml(session.nama)}</b> (NIP: ${escapeHtml(session.username)}) | Mapel: <b>${escapeHtml(session.mapel)}</b> | ${escapeHtml(rombel.tingkat)} (${escapeHtml(rombel.nama)})</p>
                 </div>
 
                 <div class="space-y-4">
@@ -377,8 +395,8 @@ Peserta didik mampu menginisiasi kegiatan bersama dalam merawat keberagaman suku
             return dbSekolah.imgKop 
                 ? `<div class="text-center mb-4"><img src="${dbSekolah.imgKop}" class="max-h-24 mx-auto object-contain"></div>`
                 : `<div class="text-center border-b-2 border-slate-800 pb-2 mb-4">
-                    <h2 class="text-base font-bold uppercase tracking-wide">${dbSekolah.nama}</h2>
-                    <p class="text-[10px] text-slate-600">NPSN: ${dbSekolah.npsn || '-'} | Perangkat Kurikulum Merdeka SMP Negeri</p>
+                    <h2 class="text-base font-bold uppercase tracking-wide">${escapeHtml(dbSekolah.nama)}</h2>
+                    <p class="text-[10px] text-slate-600">NPSN: ${escapeHtml(dbSekolah.npsn || '-')} | Perangkat Kurikulum Merdeka SMP Negeri</p>
                    </div>`;
         }
 
@@ -390,16 +408,16 @@ Peserta didik mampu menginisiasi kegiatan bersama dalam merawat keberagaman suku
                 <div class="grid grid-cols-2 text-center text-xs mt-8 pt-4 border-t">
                     <div>
                         <p>Mengetahui,</p>
-                        <p class="font-bold">Kepala ${dbSekolah.nama}</p>
+                        <p class="font-bold">Kepala ${escapeHtml(dbSekolah.nama)}</p>
                         ${ttdKepsekImg}
-                        <p class="font-bold underline">${dbSekolah.kepsek || '-'}</p>
-                        <p>NIP. ${dbSekolah.nipKepsek || '-'}</p>
+                        <p class="font-bold underline">${escapeHtml(dbSekolah.kepsek || '-')}</p>
+                        <p>NIP. ${escapeHtml(dbSekolah.nipKepsek || '-')}</p>
                     </div>
                     <div>
                         <p>Guru Mata Pelajaran,</p>
                         <div class="h-14"></div>
-                        <p class="font-bold underline">${session.nama}</p>
-                        <p>NIP. ${session.username}</p>
+                        <p class="font-bold underline">${escapeHtml(session.nama)}</p>
+                        <p>NIP. ${escapeHtml(session.username)}</p>
                     </div>
                 </div>
             `;
@@ -429,6 +447,7 @@ Peserta didik mampu menginisiasi kegiatan bersama dalam merawat keberagaman suku
         function cetakArea(elemId) {
             const content = document.getElementById(elemId).innerHTML;
             const win = window.open('', '', 'height=600,width=800');
+            if (!win) { alert('Popup diblokir browser. Izinkan popup untuk mencetak dokumen ini.'); return; }
             win.document.write('<html><head><title>Cetak Dokumen Perangkat Ajar</title><script src="https://cdn.tailwindcss.com"><\/script></head><body class="p-8">');
             win.document.write(content);
             win.document.write('</body></html>');
@@ -448,8 +467,7 @@ Peserta didik mampu menginisiasi kegiatan bersama dalam merawat keberagaman suku
         }
 
         function logout() {
-            localStorage.removeItem('cc_smp_session');
-            window.location.href = 'login.html';
+            CC.logout().finally(() => { window.location.href = 'login.html'; });
         }
     </script>
 </body>
