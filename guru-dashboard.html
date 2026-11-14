@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Guru - Dashboard Utama</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body class="bg-slate-100 font-sans text-slate-800 min-h-screen flex flex-col">
+
+    <header class="bg-indigo-700 text-white shadow-lg sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 py-3 flex justify-between items-center">
+            <div class="flex items-center space-x-3">
+                <i class="fas fa-shapes text-2xl text-amber-300"></i>
+                <h1 class="text-lg font-bold" id="header-sekolah">ClassCraft Guru</h1>
+            </div>
+            <nav class="flex gap-2 text-xs font-medium">
+                <a href="guru-dashboard.html" class="bg-indigo-900 px-3 py-2 rounded-lg"><i class="fas fa-user-circle mr-1"></i> Informasi Saya</a>
+                <a href="guru-rpp.html" class="hover:bg-indigo-600 px-3 py-2 rounded-lg transition"><i class="fas fa-file-alt mr-1"></i> Modul Ajar / RPP</a>
+                <button onclick="logout()" class="bg-red-500 hover:bg-red-600 text-white px-3 py-2 rounded-lg transition"><i class="fas fa-sign-out-alt"></i> Keluar</button>
+            </nav>
+        </div>
+    </header>
+
+    <main class="max-w-4xl mx-auto px-4 py-6 w-full flex-1 space-y-6">
+        
+        <div class="bg-white p-6 rounded-xl shadow-md border flex flex-col md:flex-row items-center gap-6">
+            <div class="w-20 h-20 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center text-4xl">
+                <i class="fas fa-user-tie"></i>
+            </div>
+            <div class="flex-1 text-center md:text-left space-y-1">
+                <h2 class="text-xl font-bold text-slate-800" id="disp-nama">-</h2>
+                <p class="text-xs text-indigo-600 font-semibold" id="disp-mapel">Mata Pelajaran: -</p>
+                <p class="text-xs text-slate-500" id="disp-nip">NIP: -</p>
+                <p class="text-xs text-slate-500" id="disp-pangkat">Pangkat / Golongan: -</p>
+            </div>
+        </div>
+
+        <div class="bg-white p-6 rounded-xl shadow-md border max-w-md mx-auto">
+            <h3 class="text-sm font-bold text-indigo-700 border-b pb-2 mb-4"><i class="fas fa-key mr-2"></i>Ganti Password Mandiri</h3>
+            <form onsubmit="gantiPassword(event)" class="space-y-3">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 mb-1">Password Lama</label>
+                    <input type="password" id="pass-lama" required class="w-full p-2 border rounded text-xs">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 mb-1">Password Baru</label>
+                    <input type="password" id="pass-baru" required class="w-full p-2 border rounded text-xs">
+                </div>
+                <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-2 rounded text-xs font-medium">Perbarui Password</button>
+            </form>
+        </div>
+
+    </main>
+
+    <script>
+        let session = null;
+        try { session = JSON.parse(localStorage.getItem('cc_smp_session')); } catch (e) {}
+
+        if (!session || session.role !== 'guru') {
+            session = { username: '198001012005011001', pass: 'guru123', role: 'guru', nama: 'Budi Santoso S.Pd', mapel: 'Pendidikan Pancasila', pangkat: 'Pembina', gol: 'IV/a' };
+            try { localStorage.setItem('cc_smp_session', JSON.stringify(session)); } catch (e) {}
+        }
+
+        let dbSekolah = JSON.parse(localStorage.getItem('cc_smp_sekolah')) || { nama: 'SMP Negeri 1 Indonesia' };
+
+        document.addEventListener('DOMContentLoaded', () => {
+            document.getElementById('header-sekolah').innerText = dbSekolah.nama;
+            document.getElementById('disp-nama').innerText = session.nama;
+            document.getElementById('disp-mapel').innerText = `Mata Pelajaran Utama: ${session.mapel}`;
+            document.getElementById('disp-nip').innerText = `NIP: ${session.username}`;
+            document.getElementById('disp-pangkat').innerText = `Pangkat / Golongan: ${session.pangkat || '-'} / ${session.gol || '-'}`;
+        });
+
+        function gantiPassword(e) {
+            e.preventDefault();
+            const passLama = document.getElementById('pass-lama').value;
+            const passBaru = document.getElementById('pass-baru').value;
+
+            if (session.pass !== passLama) return alert('Password lama salah!');
+
+            let dbUsers = JSON.parse(localStorage.getItem('cc_smp_users')) || [];
+            const idx = dbUsers.findIndex(u => u.username === session.username);
+            if (idx !== -1) {
+                dbUsers[idx].pass = passBaru;
+                session.pass = passBaru;
+                localStorage.setItem('cc_smp_users', JSON.stringify(dbUsers));
+                localStorage.setItem('cc_smp_session', JSON.stringify(session));
+                alert('Password Anda berhasil diubah!');
+                location.reload();
+            }
+        }
+
+        function logout() { localStorage.removeItem('cc_smp_session'); window.location.href = 'login.html'; }
+    </script>
+</body>
+</html>

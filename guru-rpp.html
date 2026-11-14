@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Guru - ATP & Modul Ajar RPP Generator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body class="bg-slate-100 font-sans text-slate-800 min-h-screen flex flex-col">
+
+    <!-- Header Topbar -->
+    <header class="bg-indigo-700 text-white shadow-lg sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 py-3 flex justify-between items-center">
+            <div class="flex items-center space-x-3">
+                <i class="fas fa-shapes text-2xl text-amber-300"></i>
+                <h1 class="text-lg font-bold" id="header-sekolah">ClassCraft Guru</h1>
+            </div>
+            <nav class="flex gap-2 text-xs font-medium">
+                <a href="guru-dashboard.html" class="hover:bg-indigo-600 px-3 py-2 rounded-lg transition"><i class="fas fa-user-circle mr-1"></i> Informasi Saya</a>
+                <a href="guru-rpp.html" class="bg-indigo-900 px-3 py-2 rounded-lg"><i class="fas fa-file-alt mr-1"></i> ATP & Modul Ajar</a>
+                <button onclick="logout()" class="bg-red-500 hover:bg-red-600 text-white px-3 py-2 rounded-lg transition"><i class="fas fa-sign-out-alt"></i> Keluar</button>
+            </nav>
+        </div>
+    </header>
+
+    <main class="max-w-7xl mx-auto px-4 py-6 w-full flex-1 space-y-6">
+        
+        <!-- Panel Input Dokumen CP -->
+        <div class="bg-white p-6 rounded-xl shadow-md border space-y-6">
+            <div class="border-b pb-3 flex flex-col md:flex-row justify-between items-start md:items-center gap-2">
+                <div>
+                    <h2 class="text-lg font-bold text-indigo-700"><i class="fas fa-file-import mr-2"></i>Upload Dokumen Capaian Pembelajaran (CP)</h2>
+                    <p class="text-xs text-slate-500">Unggah file CP atau tempel teks CP resmi. Sistem akan mengekstrak Elemen, TP, ATP, dan RPP secara otomatis.</p>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <!-- Form Upload / Paste -->
+                <div class="md:col-span-2 space-y-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">Unggah File CP (.txt / .doc) atau Tempel Teks CP</label>
+                        <div class="flex gap-2 mb-2">
+                            <input type="file" id="file-cp" accept=".txt,.doc,.docx" onchange="bacaFileCP(this)" class="text-xs border p-2 rounded-lg w-full bg-slate-50">
+                            <button onclick="muatContohCP()" class="bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs px-3 py-2 rounded-lg transition whitespace-nowrap font-medium">Gunakan Contoh CP</button>
+                        </div>
+                        <textarea id="text-cp" rows="7" placeholder="Tempelkan naskah Capaian Pembelajaran (CP) di sini... Contoh:&#10;Elemen: Pancasila&#10;Peserta didik memahami kronologi sejarah kelahiran Pancasila, mengidentifikasi nilai-nilai Pancasila, dan menerapkannya dalam kehidupan sehari-hari..." class="w-full p-3 border rounded-xl text-xs font-mono bg-slate-50 focus:bg-white focus:ring-2 focus:ring-indigo-500 outline-none"></textarea>
+                    </div>
+                </div>
+
+                <!-- Pengaturan Target Rombel & Parameter -->
+                <div class="bg-indigo-50/50 p-4 rounded-xl border border-indigo-100 space-y-3 text-xs">
+                    <h3 class="font-bold text-indigo-800 border-b pb-1"><i class="fas fa-sliders-h mr-1"></i> Parameter Pembelajaran</h3>
+                    
+                    <div>
+                        <label class="block font-semibold mb-1">Target Kelas / Rombel</label>
+                        <select id="cfg-rombel" class="w-full p-2 border rounded-lg bg-white"></select>
+                    </div>
+
+                    <div>
+                        <label class="block font-semibold mb-1">Semester</label>
+                        <select id="cfg-semester" class="w-full p-2 border rounded-lg bg-white">
+                            <option value="1 (Ganjil)">Semester 1 (Ganjil)</option>
+                            <option value="2 (Genap)">Semester 2 (Genap)</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="block font-semibold mb-1">Model Pembelajaran Utama</label>
+                        <select id="cfg-model" class="w-full p-2 border rounded-lg bg-white">
+                            <option value="Problem Based Learning (PBL)">Problem Based Learning (PBL)</option>
+                            <option value="Project Based Learning (PjBL)">Project Based Learning (PjBL)</option>
+                            <option value="Discovery Learning">Discovery Learning</option>
+                            <option value="Inquiry Learning">Inquiry Learning</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="block font-semibold mb-1">Alokasi Waktu Per Pertemuan</label>
+                        <input type="text" id="cfg-jp" value="2 x 40 Menit (2 JP)" class="w-full p-2 border rounded-lg bg-white">
+                    </div>
+
+                    <button onclick="prosesAnalisisCP()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2.5 rounded-lg text-xs transition shadow-md mt-2">
+                        <i class="fas fa-cogs mr-1"></i> Analisis CP & Hasilkan ATP + RPP
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Area Output Tampilan ATP & RPP -->
+        <div id="section-output" class="hidden space-y-4">
+            
+            <!-- Navigasi Tab Hasil -->
+            <div class="flex border-b border-slate-200 bg-white rounded-t-xl px-4 pt-3 gap-2">
+                <button onclick="switchHasilTab('atp')" id="tab-btn-atp" class="px-4 py-2 text-xs font-bold border-b-2 border-indigo-600 text-indigo-700">
+                    <i class="fas fa-sitemap mr-1"></i> Alur Tujuan Pembelajaran (ATP)
+                </button>
+                <button onclick="switchHasilTab('rpp')" id="tab-btn-rpp" class="px-4 py-2 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-indigo-600">
+                    <i class="fas fa-file-invoice mr-1"></i> Modul Ajar / RPP Lengkap
+                </button>
+            </div>
+
+            <!-- Tampilan Tab ATP -->
+            <div id="tab-content-atp" class="bg-white p-6 rounded-b-xl shadow-md border border-slate-200 space-y-4">
+                <div class="flex justify-between items-center border-b pb-3">
+                    <h3 class="font-bold text-slate-800 text-sm"><i class="fas fa-table mr-2 text-indigo-600"></i>Dokumen Alur Tujuan Pembelajaran (ATP) - Fase D</h3>
+                    <div class="flex gap-2">
+                        <button onclick="exportDoc('isi-atp', 'ATP_Lengkap')" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs px-3 py-1.5 rounded-lg transition font-medium"><i class="fas fa-file-word mr-1"></i>Ekspor ATP (Word)</button>
+                        <button onclick="cetakArea('isi-atp')" class="bg-slate-700 hover:bg-slate-800 text-white text-xs px-3 py-1.5 rounded-lg transition font-medium"><i class="fas fa-print mr-1"></i>Cetak ATP</button>
+                    </div>
+                </div>
+                <div id="isi-atp" class="bg-white p-6 border rounded-lg text-xs space-y-4"></div>
+            </div>
+
+            <!-- Tampilan Tab RPP -->
+            <div id="tab-content-rpp" class="hidden bg-white p-6 rounded-b-xl shadow-md border border-slate-200 space-y-4">
+                <div class="flex justify-between items-center border-b pb-3">
+                    <h3 class="font-bold text-slate-800 text-sm"><i class="fas fa-book-open mr-2 text-indigo-600"></i>Dokumen Modul Ajar / RPP Utuh Seluruh Elemen</h3>
+                    <div class="flex gap-2">
+                        <button onclick="exportDoc('isi-rpp', 'Modul_Ajar_RPP_Utuh')" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs px-3 py-1.5 rounded-lg transition font-medium"><i class="fas fa-file-word mr-1"></i>Ekspor RPP (Word)</button>
+                        <button onclick="cetakArea('isi-rpp')" class="bg-slate-700 hover:bg-slate-800 text-white text-xs px-3 py-1.5 rounded-lg transition font-medium"><i class="fas fa-print mr-1"></i>Cetak RPP</button>
+                    </div>
+                </div>
+                <div id="isi-rpp" class="bg-white p-6 border rounded-lg text-xs space-y-6"></div>
+            </div>
+
+        </div>
+
+    </main>
+
+    <!-- Script Logika Ekstraksi & Generator -->
+    <script>
+        let session = null;
+        try { session = JSON.parse(localStorage.getItem('cc_smp_session')); } catch (e) {}
+
+        if (!session || session.role !== 'guru') {
+            session = { username: '198001012005011001', pass: 'guru123', role: 'guru', nama: 'Budi Santoso S.Pd', mapel: 'Pendidikan Pancasila', pangkat: 'Pembina', gol: 'IV/a' };
+            try { localStorage.setItem('cc_smp_session', JSON.stringify(session)); } catch (e) {}
+        }
+
+        let dbSekolah = JSON.parse(localStorage.getItem('cc_smp_sekolah')) || { nama: 'SMP Negeri 1 Indonesia', kepsek: 'Dr. H. Ahmad Dahlan M.Pd', nipKepsek: '196805121992031002' };
+        let dbRombel = JSON.parse(localStorage.getItem('cc_smp_rombel')) || [
+            { id: '7-A', tingkat: 'Kelas 7', nama: '7-A', wali: 'Budi Santoso S.Pd', siswa: [] },
+            { id: '8-A', tingkat: 'Kelas 8', nama: '8-A', wali: '-', siswa: [] }
+        ];
+
+        document.addEventListener('DOMContentLoaded', () => {
+            document.getElementById('header-sekolah').innerText = dbSekolah.nama;
+            const sel = document.getElementById('cfg-rombel');
+            sel.innerHTML = '';
+            dbRombel.forEach(r => { sel.innerHTML += `<option value="${r.nama}">${r.tingkat} - Kelas ${r.nama}</option>`; });
+        });
+
+        // Membaca file lokal jika diunggah
+        function bacaFileCP(input) {
+            const file = input.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    document.getElementById('text-cp').value = e.target.result;
+                };
+                reader.readAsText(file);
+            }
+        }
+
+        // Teks Contoh CP Resmi Kurikulum Merdeka SMP
+        function muatContohCP() {
+            const contoh = `CAPAIAN PEMBELAJARAN (CP) MATA PELAJARAN: ${session.mapel.toUpperCase()} - FASE D (SMP)
+
+ELEMEN 1: SEJARAH DAN KELAHIRAN PANCASILA
+Peserta didik mampu menganalisis kronologi sejarah kelahiran Pancasila, menjelaskan fungsi dan kedudukan Pancasila sebagai dasar negara, pandangan hidup bangsa, serta ideologi negara.
+
+ELEMEN 2: NORMAM DAN UNDANG-UNDANG DASAR 1945
+Peserta didik mampu mengidentifikasi keberagaman norma di masyarakat, menganalisis hak dan kewajiban warga negara, serta memahami hirarki peraturan perundang-undangan Indonesia.
+
+ELEMEN 3: BHINNEKA TUNGGAL IKA DAN NKRI
+Peserta didik mampu menginisiasi kegiatan bersama dalam merawat keberagaman suku, agama, ras, dan antargolongan, serta menjaga keutuhan Negara Kesatuan Republik Indonesia (NKRI).`;
+
+            document.getElementById('text-cp').value = contoh;
+        }
+
+        // Analisis Dokumen CP -> Ekstraksi Elemen & TP -> Sintesis ATP & RPP Utuh
+        function prosesAnalisisCP() {
+            const rawCP = document.getElementById('text-cp').value.trim();
+            if (!rawCP) {
+                alert('Silakan masukkan atau unggah naskah Capaian Pembelajaran (CP) terlebih dahulu!');
+                return;
+            }
+
+            const rombelNama = document.getElementById('cfg-rombel').value;
+            const rombel = dbRombel.find(r => r.nama === rombelNama) || { tingkat: 'Kelas 7', nama: '7-A' };
+            const semester = document.getElementById('cfg-semester').value;
+            const model = document.getElementById('cfg-model').value;
+            const waktu = document.getElementById('cfg-jp').value;
+
+            // Ekstraksi Elemen & TP dari Teks CP
+            const listElemen = ekstraksiCPKeElemen(rawCP);
+
+            // Generate Tampilan ATP
+            renderDokumenATP(listElemen, rombel, semester);
+
+            // Generate Tampilan Modul Ajar RPP Utuh
+            renderDokumenRPPUth(listElemen, rombel, semester, model, waktu);
+
+            document.getElementById('section-output').classList.remove('hidden');
+            switchHasilTab('atp');
+        }
+
+        // Fungsi Parser pintar CP
+        function ekstraksiCPKeElemen(text) {
+            const lines = text.split('\n');
+            const elemenList = [];
+            let currentElemen = null;
+
+            lines.forEach(line => {
+                const trimmed = line.trim();
+                if (!trimmed) return;
+
+                if (trimmed.toUpperCase().startsWith('ELEMEN') || trimmed.toUpperCase().includes('ELEMEN:')) {
+                    if (currentElemen) elemenList.push(currentElemen);
+                    currentElemen = {
+                        nama: trimmed.replace(/ELEMEN \d+:?/i, '').replace(/ELEMEN:?/i, '').trim() || 'Elemen Utama',
+                        cpTeks: '',
+                        tpList: []
+                    };
+                } else if (currentElemen) {
+                    currentElemen.cpTeks += ' ' + trimmed;
+                }
+            });
+
+            if (currentElemen) elemenList.push(currentElemen);
+
+            // Jika pola ELEMEN tidak terdeteksi, bagi berdasarkan paragraf
+            if (elemenList.length === 0) {
+                const paragraphs = text.split('\n\n').filter(p => p.trim());
+                paragraphs.forEach((p, idx) => {
+                    elemenList.push({
+                        nama: `Elemen Pembelajaran ${idx + 1}`,
+                        cpTeks: p.trim(),
+                        tpList: []
+                    });
+                });
+            }
+
+            // Ekstraksi Tujuan Pembelajaran (TP) per Elemen
+            elemenList.forEach((el, eIdx) => {
+                const kalimat = el.cpTeks.split('.').map(k => k.trim()).filter(k => k.length > 10);
+                if (kalimat.length > 0) {
+                    kalimat.forEach((k, kIdx) => {
+                        el.tpList.push({
+                            kode: `TP ${eIdx + 1}.${kIdx + 1}`,
+                            deskripsi: `Peserta didik mampu ${k.charAt(0).toLowerCase() + k.slice(1)}.`,
+                            jp: '4 JP',
+                            p3: 'Bernalar Kritis, Gotong Royong'
+                        });
+                    });
+                } else {
+                    el.tpList.push({
+                        kode: `TP ${eIdx + 1}.1`,
+                        deskripsi: `Peserta didik mampu memahami dan menerapkan konsep ${el.nama}.`,
+                        jp: '4 JP',
+                        p3: 'Bernalar Kritis, Mandiri'
+                    });
+                }
+            });
+
+            return elemenList;
+        }
+
+        // Render ATP ke dalam HTML
+        function renderDokumenATP(listElemen, rombel, semester) {
+            let kopHtml = dapatkanKOPHeader();
+            let tableRows = '';
+            let totalJP = 0;
+
+            listElemen.forEach(el => {
+                el.tpList.forEach((tp, idx) => {
+                    totalJP += 4;
+                    tableRows += `
+                        <tr>
+                            <td class="p-2 border font-bold text-center">${tp.kode}</td>
+                            <td class="p-2 border font-semibold">${idx === 0 ? el.nama : ''}</td>
+                            <td class="p-2 border">${tp.deskripsi}</td>
+                            <td class="p-2 border text-center font-bold">${tp.jp}</td>
+                            <td class="p-2 border">${tp.p3}</td>
+                        </tr>
+                    `;
+                });
+            });
+
+            const html = `
+                ${kopHtml}
+                <div class="text-center font-bold mb-4">
+                    <h2 class="text-sm uppercase text-indigo-900">ALUR TUJUAN PEMBELAJARAN (ATP) KURIKULUM MERDEKA</h2>
+                    <p class="text-xs font-normal">Mata Pelajaran: <b>${session.mapel}</b> | Fase D (${rombel.tingkat}) | ${semester}</p>
+                </div>
+
+                <table class="w-full text-xs border-collapse border border-slate-300 mb-4">
+                    <thead>
+                        <tr class="bg-indigo-50 text-indigo-900 border">
+                            <th class="p-2 border w-16">Kode TP</th>
+                            <th class="p-2 border w-1/4">Elemen CP</th>
+                            <th class="p-2 border">Rumusan Tujuan Pembelajaran (TP)</th>
+                            <th class="p-2 border w-16">Alokasi</th>
+                            <th class="p-2 border w-1/4">Profil Pelajar Pancasila</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${tableRows}
+                    </tbody>
+                    <tfoot>
+                        <tr class="bg-slate-100 font-bold">
+                            <td colspan="3" class="p-2 border text-right">Total Perkiraan Alokasi Waktu:</td>
+                            <td class="p-2 border text-center text-indigo-700">${totalJP} JP</td>
+                            <td class="p-2 border">Terpetakan untuk 1 Semester</td>
+                        </tr>
+                    </tfoot>
+                </table>
+
+                ${dapatkanBlockTTD()}
+            `;
+
+            document.getElementById('isi-atp').innerHTML = html;
+        }
+
+        // Render RPP Utuh (Multi-Elemen & Multi-TP)
+        function renderDokumenRPPUth(listElemen, rombel, semester, model, waktu) {
+            let kopHtml = dapatkanKOPHeader();
+            let modulSection = '';
+
+            listElemen.forEach((el, eIdx) => {
+                el.tpList.forEach((tp) => {
+                    modulSection += `
+                        <div class="border border-slate-300 rounded-lg p-4 space-y-3 bg-slate-50/50">
+                            <div class="border-b pb-2 flex justify-between items-center">
+                                <h4 class="font-bold text-indigo-800 uppercase text-xs"><i class="fas fa-bookmark mr-1"></i> Modul Ajar: ${tp.kode} - ${el.nama}</h4>
+                                <span class="bg-indigo-100 text-indigo-700 font-bold px-2 py-0.5 rounded text-[10px]">${waktu}</span>
+                            </div>
+
+                            <table class="w-full text-xs border-collapse border bg-white">
+                                <tr><td class="p-1.5 border font-semibold w-1/3">Elemen Pembelajaran</td><td class="p-1.5 border">${el.nama}</td></tr>
+                                <tr><td class="p-1.5 border font-semibold">Tujuan Pembelajaran (TP)</td><td class="p-1.5 border">${tp.deskripsi}</td></tr>
+                                <tr><td class="p-1.5 border font-semibold">Model Pembelajaran</td><td class="p-1.5 border">${model}</td></tr>
+                                <tr><td class="p-1.5 border font-semibold">Dimensi P3</td><td class="p-1.5 border">${tp.p3}</td></tr>
+                            </table>
+
+                            <div class="bg-white p-3 border rounded text-xs space-y-1.5">
+                                <p class="font-bold text-slate-700">Rincian Kegiatan Pembelajaran:</p>
+                                <p><b>1. Pendahuluan (10 Menit):</b> Guru membuka KBM dengan berdoa, menyapa siswa, serta menyampaikan TP dan relevansinya.</p>
+                                <p><b>2. Kegiatan Inti (60 Menit):</b> Menggunakan sintaks ${model}, siswa menganalisis materi ${el.nama}, berdiskusi kelompok, dan menyajikan hasil kinerjanya.</p>
+                                <p><b>3. Penutup (10 Menit):</b> Refleksi bersama, kesimpulan materi, dan penutupan dengan doa.</p>
+                            </div>
+                        </div>
+                    `;
+                });
+            });
+
+            const html = `
+                ${kopHtml}
+                <div class="text-center font-bold mb-4">
+                    <h2 class="text-sm uppercase text-indigo-900">PERANGKAT MODUL AJAR / RPP UTUH SEKALIGUS</h2>
+                    <p class="text-xs font-normal">Penyusun: <b>${session.nama}</b> (NIP: ${session.username}) | Mapel: <b>${session.mapel}</b> | ${rombel.tingkat} (${rombel.nama})</p>
+                </div>
+
+                <div class="space-y-4">
+                    ${modulSection}
+                </div>
+
+                ${dapatkanBlockTTD()}
+            `;
+
+            document.getElementById('isi-rpp').innerHTML = html;
+        }
+
+        // Helper KOP Surat
+        function dapatkanKOPHeader() {
+            return dbSekolah.imgKop 
+                ? `<div class="text-center mb-4"><img src="${dbSekolah.imgKop}" class="max-h-24 mx-auto object-contain"></div>`
+                : `<div class="text-center border-b-2 border-slate-800 pb-2 mb-4">
+                    <h2 class="text-base font-bold uppercase tracking-wide">${dbSekolah.nama}</h2>
+                    <p class="text-[10px] text-slate-600">NPSN: ${dbSekolah.npsn || '-'} | Perangkat Kurikulum Merdeka SMP Negeri</p>
+                   </div>`;
+        }
+
+        // Helper Legalisasi TTD
+        function dapatkanBlockTTD() {
+            let ttdKepsekImg = dbSekolah.imgTtd ? `<img src="${dbSekolah.imgTtd}" class="h-14 mx-auto object-contain my-1">` : `<div class="h-12"></div>`;
+
+            return `
+                <div class="grid grid-cols-2 text-center text-xs mt-8 pt-4 border-t">
+                    <div>
+                        <p>Mengetahui,</p>
+                        <p class="font-bold">Kepala ${dbSekolah.nama}</p>
+                        ${ttdKepsekImg}
+                        <p class="font-bold underline">${dbSekolah.kepsek || '-'}</p>
+                        <p>NIP. ${dbSekolah.nipKepsek || '-'}</p>
+                    </div>
+                    <div>
+                        <p>Guru Mata Pelajaran,</p>
+                        <div class="h-14"></div>
+                        <p class="font-bold underline">${session.nama}</p>
+                        <p>NIP. ${session.username}</p>
+                    </div>
+                </div>
+            `;
+        }
+
+        // Switcher Tab Tampilan Hasil
+        function switchHasilTab(tab) {
+            const btnAtp = document.getElementById('tab-btn-atp');
+            const btnRpp = document.getElementById('tab-btn-rpp');
+            const contentAtp = document.getElementById('tab-content-atp');
+            const contentRpp = document.getElementById('tab-content-rpp');
+
+            if (tab === 'atp') {
+                btnAtp.className = 'px-4 py-2 text-xs font-bold border-b-2 border-indigo-600 text-indigo-700';
+                btnRpp.className = 'px-4 py-2 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-indigo-600';
+                contentAtp.classList.remove('hidden');
+                contentRpp.classList.add('hidden');
+            } else {
+                btnRpp.className = 'px-4 py-2 text-xs font-bold border-b-2 border-indigo-600 text-indigo-700';
+                btnAtp.className = 'px-4 py-2 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-indigo-600';
+                contentRpp.classList.remove('hidden');
+                contentAtp.classList.add('hidden');
+            }
+        }
+
+        // Fungsi Cetak & Ekspor
+        function cetakArea(elemId) {
+            const content = document.getElementById(elemId).innerHTML;
+            const win = window.open('', '', 'height=600,width=800');
+            win.document.write('<html><head><title>Cetak Dokumen Perangkat Ajar</title><script src="https://cdn.tailwindcss.com"><\/script></head><body class="p-8">');
+            win.document.write(content);
+            win.document.write('</body></html>');
+            win.document.close();
+            setTimeout(() => win.print(), 500);
+        }
+
+        function exportDoc(elemId, filename = 'Dokumen_Perangkat_Ajar') {
+            const html = "<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'><head><meta charset='utf-8'></head><body>" + document.getElementById(elemId).innerHTML + "</body></html>";
+            const blob = new Blob(['\ufeff', html], { type: 'application/msword' });
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = filename + '.doc';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+        }
+
+        function logout() {
+            localStorage.removeItem('cc_smp_session');
+            window.location.href = 'login.html';
+        }
+    </script>
+</body>
+</html>
