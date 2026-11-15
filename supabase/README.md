@@ -26,6 +26,8 @@ dan database berada pada kondisi yang selaras (tidak ada migrasi tertunda).
 4. `20261114095442` — perbaikan kolom token Auth (GoTrue)
 5. `20261114095509` — hapus kolom `guru.password_hash`
 6. `20261114095607` — cabut `is_admin()` dari `anon`
+7. `20261115024215` — tabel `jurnal_mengajar`, `presensi`, `paket_soal` (+ RLS, index, trigger `updated_at`)
+8. `20261115024237` — hapus policy warisan pada `jurnal_mengajar`
 
 ## Menghubungkan ke GitHub (dashboard)
 

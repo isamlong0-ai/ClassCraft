@@ -86,6 +86,63 @@ create table if not exists public.modul_ajar (
 );
 
 -- -------------------------------------------------------------
+-- Tabel: jurnal_mengajar (jurnal mengajar harian guru)
+-- -------------------------------------------------------------
+create table if not exists public.jurnal_mengajar (
+    id                uuid primary key default gen_random_uuid(),
+    guru_id           uuid not null references public.guru(id) on delete cascade,
+    rombel_id         uuid not null references public.rombel(id) on delete cascade,
+    mapel             text not null default '',
+    tanggal           date not null default current_date,
+    jam_ke            text not null default '1-2',
+    tahun_ajaran      text not null default '2025/2026',
+    semester          text not null default 'Ganjil' check (semester in ('Ganjil', 'Genap')),
+    materi            text not null,
+    kegiatan          text default '',
+    kehadiran_ringkas text default '',
+    catatan_kejadian  text default '-',
+    created_at        timestamptz not null default now(),
+    updated_at        timestamptz not null default now()
+);
+
+-- -------------------------------------------------------------
+-- Tabel: presensi (presensi / absensi siswa per pertemuan)
+-- -------------------------------------------------------------
+create table if not exists public.presensi (
+    id           uuid primary key default gen_random_uuid(),
+    rombel_id    uuid not null references public.rombel(id) on delete cascade,
+    siswa_id     uuid not null references public.siswa(id) on delete cascade,
+    guru_id      uuid references public.guru(id) on delete set null,
+    mapel        text not null default '',
+    tanggal      date not null default current_date,
+    tahun_ajaran text not null default '2025/2026',
+    semester     text not null default 'Ganjil' check (semester in ('Ganjil', 'Genap')),
+    status       text not null default 'H' check (status in ('H', 'S', 'I', 'A')),
+    keterangan   text default '',
+    created_at   timestamptz not null default now(),
+    updated_at   timestamptz not null default now(),
+    unique (rombel_id, siswa_id, tanggal, mapel)
+);
+
+-- -------------------------------------------------------------
+-- Tabel: paket_soal (bank soal & dokumen asesmen)
+-- -------------------------------------------------------------
+create table if not exists public.paket_soal (
+    id            uuid primary key default gen_random_uuid(),
+    guru_id       uuid not null references public.guru(id) on delete cascade,
+    tahun_ajaran  text not null default '2025/2026',
+    semester      text not null default 'Ganjil' check (semester in ('Ganjil', 'Genap')),
+    jenis_asesmen text not null default 'Sumatif Lingkup Materi',
+    tingkat       text not null default 'Kelas 7',
+    mapel         text not null default '',
+    tanggal_ujian date default current_date,
+    alokasi_waktu text not null default '90 Menit',
+    daftar_soal   jsonb not null default '[]'::jsonb,
+    created_at    timestamptz not null default now(),
+    updated_at    timestamptz not null default now()
+);
+
+-- -------------------------------------------------------------
 -- Index bantu
 -- -------------------------------------------------------------
 create index if not exists idx_guru_role         on public.guru(role);
@@ -93,6 +150,15 @@ create index if not exists idx_rombel_wali       on public.rombel(wali_id);
 create index if not exists idx_siswa_rombel      on public.siswa(rombel_id);
 create index if not exists idx_modul_ajar_guru   on public.modul_ajar(guru_id);
 create index if not exists idx_modul_ajar_rombel on public.modul_ajar(rombel_id);
+
+create index if not exists idx_jurnal_guru_tgl     on public.jurnal_mengajar(guru_id, tanggal);
+create index if not exists idx_jurnal_rombel       on public.jurnal_mengajar(rombel_id);
+create index if not exists idx_jurnal_ta_sem       on public.jurnal_mengajar(tahun_ajaran, semester);
+create index if not exists idx_presensi_rombel_tgl on public.presensi(rombel_id, tanggal);
+create index if not exists idx_presensi_siswa      on public.presensi(siswa_id);
+create index if not exists idx_presensi_ta_sem     on public.presensi(tahun_ajaran, semester);
+create index if not exists idx_paket_soal_guru     on public.paket_soal(guru_id);
+create index if not exists idx_paket_soal_ta_sem   on public.paket_soal(tahun_ajaran, semester);
 
 -- Hubungkan profil guru ke user Auth
 alter table public.guru drop constraint if exists guru_id_auth_fkey;
@@ -179,6 +245,26 @@ grant execute on function public.admin_create_guru(text, text, text, text, text,
 grant execute on function public.admin_reset_guru_password(text, text) to authenticated;
 grant execute on function public.is_admin() to authenticated;
 
+-- -------------------------------------------------------------
+-- Trigger: perbarui updated_at otomatis (modul jurnal/presensi/paket soal)
+-- -------------------------------------------------------------
+create or replace function public.cc_set_updated_at()
+returns trigger language plpgsql
+as $$
+begin
+    new.updated_at = now();
+    return new;
+end $$;
+
+do $$
+declare t text;
+begin
+    foreach t in array array['jurnal_mengajar', 'presensi', 'paket_soal'] loop
+        execute format('drop trigger if exists trg_%1$s_updated on public.%1$s;', t);
+        execute format('create trigger trg_%1$s_updated before update on public.%1$s for each row execute function public.cc_set_updated_at();', t);
+    end loop;
+end $$;
+
 -- =============================================================
 -- Row Level Security
 -- Baca: semua user yang login. Tulis: hanya admin.
@@ -210,6 +296,24 @@ create policy admin_guru    on public.guru       for all to authenticated using 
 create policy admin_rombel  on public.rombel     for all to authenticated using (public.is_admin()) with check (public.is_admin());
 create policy admin_siswa   on public.siswa      for all to authenticated using (public.is_admin()) with check (public.is_admin());
 create policy write_modul   on public.modul_ajar for all to authenticated using (true) with check (true);
+
+-- Modul jurnal/presensi/paket soal: baca untuk user login,
+-- tulis hanya oleh pemilik data (guru_id = auth.uid()) atau admin.
+alter table public.jurnal_mengajar enable row level security;
+alter table public.presensi       enable row level security;
+alter table public.paket_soal     enable row level security;
+
+create policy read_jurnal_mengajar on public.jurnal_mengajar for select to authenticated using (true);
+create policy write_jurnal_mengajar on public.jurnal_mengajar for all to authenticated
+    using (guru_id = auth.uid() or public.is_admin()) with check (guru_id = auth.uid() or public.is_admin());
+
+create policy read_presensi on public.presensi for select to authenticated using (true);
+create policy write_presensi on public.presensi for all to authenticated
+    using (guru_id = auth.uid() or public.is_admin()) with check (guru_id = auth.uid() or public.is_admin());
+
+create policy read_paket_soal on public.paket_soal for select to authenticated using (true);
+create policy write_paket_soal on public.paket_soal for all to authenticated
+    using (guru_id = auth.uid() or public.is_admin()) with check (guru_id = auth.uid() or public.is_admin());
 
 -- =============================================================
 -- Data awal (seed): sekolah, guru (+user Auth), rombel, siswa

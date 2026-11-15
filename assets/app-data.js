@@ -383,6 +383,7 @@
 
     window.CC = {
         isConfigured: function () { return configured; },
+        client: sb,
         homeFor: function (role) { return role === 'admin' ? 'admin-profil.html' : 'guru-dashboard.html'; },
         getSession: getSession,
         setSession: setSession,

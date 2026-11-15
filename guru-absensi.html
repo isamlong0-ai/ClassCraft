@@ -7,6 +7,8 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="assets/supabase-config.js"></script>
+    <script src="assets/app-data.js"></script>
 </head>
 <body class="bg-slate-100 font-sans text-slate-800 min-h-screen flex flex-col">
 
@@ -169,12 +171,9 @@
 
     <script>
         // =========================================================================
-        // KONFIGURASI SUPABASE (Ganti dengan URL & Anon Key project Anda,
-        // atau gunakan variabel global dari file config.js jika sudah ada)
+        // KONFIGURASI SUPABASE (memakai konfigurasi terpusat assets/supabase-config.js)
         // =========================================================================
-        const SUPABASE_URL = window.SUPABASE_URL || 'https://PROJECT_ID_ANDA.supabase.co';
-        const SUPABASE_ANON_KEY = window.SUPABASE_ANON_KEY || 'ANON_KEY_ANDA';
-        const sb = window.sb || supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        const sb = CC.client;
 
         let currentUser = null;
         let profilGuru = null;
@@ -182,20 +181,30 @@
         let daftarRombel = [];
         let daftarSiswa = [];
 
+        function esc(v) {
+            return String(v == null ? '' : v)
+                .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+        }
+
+        // --- Guard: hanya guru yang sudah login ---
+        let session = CC.getSession();
+        if (!session) {
+            window.location.replace('index.html');
+            throw new Error('Akses ditolak: silakan login terlebih dahulu.');
+        }
+        if (session.role !== 'guru') {
+            window.location.replace(CC.homeFor(session.role));
+            throw new Error('Akses ditolak: halaman ini khusus guru.');
+        }
+        currentUser = session;
+
         document.addEventListener('DOMContentLoaded', async () => {
             // Set tanggal hari ini (WIB)
             const today = new Date().toLocaleDateString('en-CA');
             document.getElementById('filter-tanggal').value = today;
 
-            // 1. Cek Sesi Supabase Auth
-            const { data: { session }, error } = await sb.auth.getSession();
-            if (error || !session) {
-                window.location.href = 'login.html';
-                return;
-            }
-            currentUser = session.user;
-
-            // 2. Muat Profil Guru & Profil Sekolah
+            // 1. Muat Profil Guru & Profil Sekolah
             const [resGuru, resSekolah] = await Promise.all([
                 sb.from('guru').select('*').eq('id', currentUser.id).single(),
                 sb.from('sekolah').select('*').limit(1).single()
@@ -206,7 +215,7 @@
                 document.getElementById('filter-mapel').value = profilGuru.mapel || '';
             } else {
                 alert('Profil guru tidak ditemukan di database.');
-                window.location.href = 'login.html';
+                window.location.href = 'index.html';
                 return;
             }
 
@@ -234,13 +243,13 @@
             selRombel.innerHTML = '';
 
             if (daftarRombel.length === 0) {
-                selRombel.innerHTML = `<option value="">Belum ada rombel T.A ${profilSekolah.tahun_ajaran}</option>`;
-                document.getElementById('tbody-presensi').innerHTML = `<tr><td colspan="6" class="text-center p-6 text-slate-400">Admin belum membuat rombel pada Tahun Ajaran ${profilSekolah.tahun_ajaran}.</td></tr>`;
+                selRombel.innerHTML = `<option value="">Belum ada rombel T.A ${esc(profilSekolah.tahun_ajaran)}</option>`;
+                document.getElementById('tbody-presensi').innerHTML = `<tr><td colspan="6" class="text-center p-6 text-slate-400">Admin belum membuat rombel pada Tahun Ajaran ${esc(profilSekolah.tahun_ajaran)}.</td></tr>`;
                 return;
             }
 
             daftarRombel.forEach(r => {
-                selRombel.innerHTML += `<option value="${r.id}">${r.tingkat} - Kelas ${r.nama}</option>`;
+                selRombel.innerHTML += `<option value="${esc(r.id)}">${esc(r.tingkat)} - Kelas ${esc(r.nama)}</option>`;
             });
 
             await muatDataPresensi();
@@ -302,11 +311,11 @@
                 const ket = record ? (record.keterangan || '') : '';
 
                 tbody.innerHTML += `
-                    <tr class="hover:bg-slate-50" data-siswa-id="${s.id}">
+                    <tr class="hover:bg-slate-50" data-siswa-id="${esc(s.id)}">
                         <td class="p-2.5 text-center">${idx + 1}</td>
-                        <td class="p-2.5 font-mono text-[11px]">${s.nisn}<br><span class="text-slate-400">${s.nipd || '-'}</span></td>
-                        <td class="p-2.5 font-semibold text-slate-800">${s.nama}</td>
-                        <td class="p-2.5 text-center font-bold text-slate-600">${s.jk}</td>
+                        <td class="p-2.5 font-mono text-[11px]">${esc(s.nisn)}<br><span class="text-slate-400">${esc(s.nipd || '-')}</span></td>
+                        <td class="p-2.5 font-semibold text-slate-800">${esc(s.nama)}</td>
+                        <td class="p-2.5 text-center font-bold text-slate-600">${esc(s.jk)}</td>
                         <td class="p-2.5">
                             <div class="flex justify-center gap-2">
                                 ${renderRadioStatus(s.id, 'H', 'Hadir', status, 'emerald')}
@@ -316,7 +325,7 @@
                             </div>
                         </td>
                         <td class="p-2.5">
-                            <input type="text" id="ket-${s.id}" value="${ket}" placeholder="Catatan opsional..." class="w-full p-1.5 border rounded text-xs bg-white">
+                            <input type="text" id="ket-${esc(s.id)}" value="${esc(ket)}" placeholder="Catatan opsional..." class="w-full p-1.5 border rounded text-xs bg-white">
                         </td>
                     </tr>
                 `;
@@ -409,27 +418,27 @@
 
             // Render KOP & TTD
             document.getElementById('rekap-kop-header').innerHTML = profilSekolah.img_kop
-                ? `<div class="text-center mb-3"><img src="${profilSekolah.img_kop}" class="max-h-24 mx-auto object-contain"></div>`
-                : `<div class="text-center border-b-2 border-slate-800 pb-2 mb-3"><h2 class="text-base font-bold uppercase">${profilSekolah.nama}</h2><p class="text-[10px]">NPSN: ${profilSekolah.npsn || '-'}</p></div>`;
+                ? `<div class="text-center mb-3"><img src="${esc(profilSekolah.img_kop)}" class="max-h-24 mx-auto object-contain"></div>`
+                : `<div class="text-center border-b-2 border-slate-800 pb-2 mb-3"><h2 class="text-base font-bold uppercase">${esc(profilSekolah.nama)}</h2><p class="text-[10px]">NPSN: ${esc(profilSekolah.npsn || '-')}</p></div>`;
 
             document.getElementById('rekap-subjudul').innerText =
                 `Kelas: ${rombelObj.nama} (${rombelObj.tingkat}) | Mapel: ${mapel || 'Semua'} | Periode: ${namaBulan} | T.A. ${profilSekolah.tahun_ajaran} (${profilSekolah.semester})`;
 
-            const ttdKepsek = profilSekolah.img_ttd ? `<img src="${profilSekolah.img_ttd}" class="h-14 mx-auto object-contain my-1">` : `<div class="h-12"></div>`;
+            const ttdKepsek = profilSekolah.img_ttd ? `<img src="${esc(profilSekolah.img_ttd)}" class="h-14 mx-auto object-contain my-1">` : `<div class="h-12"></div>`;
             document.getElementById('rekap-ttd-footer').innerHTML = `
                 <div class="grid grid-cols-2 text-center text-xs mt-8 pt-4">
                     <div>
                         <p>Mengetahui,</p>
-                        <p class="font-bold">Kepala ${profilSekolah.nama}</p>
+                        <p class="font-bold">Kepala ${esc(profilSekolah.nama)}</p>
                         ${ttdKepsek}
-                        <p class="font-bold underline">${profilSekolah.kepsek || '-'}</p>
-                        <p>NIP. ${profilSekolah.nip_kepsek || '-'}</p>
+                        <p class="font-bold underline">${esc(profilSekolah.kepsek || '-')}</p>
+                        <p>NIP. ${esc(profilSekolah.nip_kepsek || '-')}</p>
                     </div>
                     <div>
                         <p>Guru Mata Pelajaran,</p>
                         <div class="h-14"></div>
-                        <p class="font-bold underline">${profilGuru.nama}</p>
-                        <p>NIP. ${profilGuru.username}</p>
+                        <p class="font-bold underline">${esc(profilGuru.nama)}</p>
+                        <p>NIP. ${esc(profilGuru.username)}</p>
                     </div>
                 </div>
             `;
@@ -480,9 +489,9 @@
                 tbody.innerHTML += `
                     <tr>
                         <td class="p-2 border text-center">${idx + 1}</td>
-                        <td class="p-2 border font-mono">${s.nisn}</td>
-                        <td class="p-2 border font-medium">${s.nama}</td>
-                        <td class="p-2 border text-center">${s.jk}</td>
+                        <td class="p-2 border font-mono">${esc(s.nisn)}</td>
+                        <td class="p-2 border font-medium">${esc(s.nama)}</td>
+                        <td class="p-2 border text-center">${esc(s.jk)}</td>
                         <td class="p-2 border text-center font-bold text-emerald-700">${st.H}</td>
                         <td class="p-2 border text-center font-bold text-amber-700">${st.S}</td>
                         <td class="p-2 border text-center font-bold text-blue-700">${st.I}</td>
@@ -525,6 +534,10 @@
         function cetakRekap() {
             const content = document.getElementById('area-cetak-rekap').innerHTML;
             const win = window.open('', '', 'height=650,width=900');
+            if (!win) {
+                alert('Jendela cetak diblokir browser. Izinkan popup untuk situs ini lalu coba lagi.');
+                return;
+            }
             win.document.write('<html><head><title>Cetak Rekap Presensi</title><script src="https://cdn.tailwindcss.com"><\/script></head><body class="p-8">');
             win.document.write(content);
             win.document.write('</body></html>');
@@ -533,8 +546,8 @@
         }
 
         async function logout() {
-            await sb.auth.signOut();
-            window.location.href = 'login.html';
+            await CC.logout();
+            window.location.href = 'index.html';
         }
     </script>
 </body>
