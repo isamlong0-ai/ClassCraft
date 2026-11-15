@@ -1,0 +1,5 @@
+# Berkas sementara Supabase CLI / Branching (jangan di-commit)
+.branches
+.temp
+.env
+.env.*
