@@ -38,62 +38,52 @@
                 </div>
             </div>
 
-            <div class="text-xs text-slate-500 bg-amber-50 p-2.5 rounded-lg border border-amber-200">
-                <p class="mb-1 font-semibold"><i class="fas fa-info-circle text-amber-600 mr-1"></i> Akun Bawaan:</p>
-                • <b>Admin:</b> admin / admin123<br>
-                • <b>Guru:</b> 198001012005011001 / guru123
-            </div>
+            <div id="login-error" class="hidden text-xs text-rose-700 bg-rose-50 p-2.5 rounded-lg border border-rose-200"></div>
 
             <button type="submit" id="btn-login" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2.5 rounded-lg text-sm transition shadow-md cursor-pointer">
                 Masuk ke Sistem <i class="fas fa-arrow-right ml-1"></i>
-            </button>
-
-            <button type="button" id="btn-force" class="w-full bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs py-2 rounded-lg font-medium transition cursor-pointer">
-                <i class="fas fa-wrench mr-1"></i> Masuk Langsung ke Admin
             </button>
         </form>
     </div>
 
     <script>
+        const errBox = document.getElementById('login-error');
+
+        function tampilkanError(msg) {
+            errBox.textContent = msg;
+            errBox.classList.remove('hidden');
+        }
+
         // Event Submit Form Login (mendukung tombol Enter)
         document.getElementById('form-login').addEventListener('submit', async function(e) {
             e.preventDefault();
+            errBox.classList.add('hidden');
+
             const u = document.getElementById('login-username').value.trim();
             const p = document.getElementById('login-password').value.trim();
 
             if (!u || !p) {
-                alert('Silakan isi Username dan Password terlebih dahulu!');
+                tampilkanError('Silakan isi Username/NIP dan Password terlebih dahulu.');
                 return;
             }
 
             const btn = document.getElementById('btn-login');
             btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i> Memeriksa...';
             try {
-                const user = await CC.login(u, p);
-                if (user) {
-                    CC.setSession(user);
-                    window.location.href = (user.role === 'admin') ? 'admin-profil.html' : 'guru-dashboard.html';
+                const hasil = await CC.loginDetailed(u, p);
+                if (hasil.user) {
+                    CC.setSession(hasil.user);
+                    window.location.href = CC.homeFor(hasil.user.role);
                 } else {
-                    alert('Username/NIP atau Password salah!');
+                    tampilkanError(hasil.error || 'NIP/Username atau Password salah.');
                 }
             } catch (err) {
                 console.error(err);
-                alert('Gagal login: ' + (err.message || err));
+                tampilkanError('Gagal login: ' + (err.message || err));
             } finally {
                 btn.disabled = false;
-            }
-        });
-
-        // Event Tombol Masuk Langsung (Pintas)
-        document.getElementById('btn-force').addEventListener('click', async function() {
-            try {
-                const user = await CC.login('admin', 'admin123');
-                if (!user) { alert('Akun admin bawaan tidak dapat masuk. Periksa koneksi dan database.'); return; }
-                CC.setSession(user);
-                window.location.href = 'admin-profil.html';
-            } catch (err) {
-                console.error(err);
-                alert('Gagal masuk: ' + (err.message || err));
+                btn.innerHTML = 'Masuk ke Sistem <i class="fas fa-arrow-right ml-1"></i>';
             }
         });
     </script>

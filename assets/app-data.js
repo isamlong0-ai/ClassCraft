@@ -171,22 +171,55 @@
         return prof.data || null;
     }
 
-    async function login(username, password) {
+    // Ubah error Supabase Auth menjadi pesan yang mudah dipahami pengguna.
+    function authErrorMessage(err) {
+        if (!err) return '';
+        var code = err.code || err.error_code || '';
+        var msg = err.message || String(err);
+        if (code === 'invalid_credentials' || /invalid login credentials/i.test(msg)) {
+            return 'NIP/Username atau Password salah. Pastikan NIP sesuai dan password awal guru adalah "guru123".';
+        }
+        if (code === 'email_not_confirmed' || /email not confirmed/i.test(msg)) {
+            return 'Akun belum dikonfirmasi. Hubungi admin sekolah.';
+        }
+        if (code === 'over_request_rate_limit' || /rate limit|too many/i.test(msg)) {
+            return 'Terlalu banyak percobaan masuk. Tunggu sebentar lalu coba lagi.';
+        }
+        if (/failed to fetch|networkerror|load failed/i.test(msg)) {
+            return 'Tidak dapat menghubungi server. Periksa koneksi internet Anda.';
+        }
+        return msg;
+    }
+
+    // Versi login yang mengembalikan pesan error asli (untuk ditampilkan di form).
+    async function loginDetailed(username, password) {
+        username = String(username == null ? '' : username).trim();
         if (sb) {
             var res = await sb.auth.signInWithPassword({ email: emailFor(username), password: password });
-            if (res.error || !res.data || !res.data.user) return null;
+            if (res.error) return { user: null, error: authErrorMessage(res.error), code: res.error.code || '' };
+            if (!res.data || !res.data.user) {
+                return { user: null, error: 'NIP/Username atau Password salah.', code: 'invalid_credentials' };
+            }
             try {
                 var prof = await fetchProfile(res.data.user.id);
-                if (!prof) { await sb.auth.signOut(); return null; }
-                return prof;
+                if (!prof) {
+                    await sb.auth.signOut();
+                    return { user: null, error: 'Akun terautentikasi, tetapi profil guru tidak ditemukan. Hubungi admin sekolah.', code: 'profile_missing' };
+                }
+                return { user: prof, error: null, code: '' };
             } catch (e) {
                 await sb.auth.signOut();
-                throw e;
+                return { user: null, error: authErrorMessage(e), code: (e && e.code) || 'profile_error' };
             }
         }
         var users = seedUsersLocal();
-        var u = users.find(function (x) { return x.username === username && x.pass === password; });
-        return u ? Object.assign({}, u) : null;
+        var u = users.find(function (x) { return String(x.username).trim() === username && x.pass === password; });
+        return u ? { user: Object.assign({}, u), error: null, code: '' } : { user: null, error: 'NIP/Username atau Password salah.', code: 'invalid_credentials' };
+    }
+
+    async function login(username, password) {
+        var r = await loginDetailed(username, password);
+        return r.user;
     }
 
     async function logout() {
@@ -389,6 +422,7 @@
         setSession: setSession,
         clearSession: clearSession,
         login: login,
+        loginDetailed: loginDetailed,
         logout: logout,
         getAuthUser: getAuthUser,
         requireAuth: requireAuth,
