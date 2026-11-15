@@ -1,0 +1,541 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Guru - Presensi & Absensi Siswa</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body class="bg-slate-100 font-sans text-slate-800 min-h-screen flex flex-col">
+
+    <!-- Topbar -->
+    <header class="bg-indigo-700 text-white shadow-lg sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 py-3 flex flex-col md:flex-row justify-between items-center gap-2">
+            <div class="flex items-center space-x-3">
+                <i class="fas fa-shapes text-2xl text-amber-300"></i>
+                <div>
+                    <h1 class="text-lg font-bold leading-tight" id="header-sekolah">ClassCraft Guru</h1>
+                    <p class="text-[10px] text-indigo-200" id="header-info">Memuat sesi...</p>
+                </div>
+            </div>
+            <nav class="flex flex-wrap gap-1.5 text-xs font-medium">
+                <a href="guru-dashboard.html" class="hover:bg-indigo-600 px-3 py-2 rounded-lg transition"><i class="fas fa-user-circle mr-1"></i> Informasi Saya</a>
+                <a href="guru-rpp.html" class="hover:bg-indigo-600 px-3 py-2 rounded-lg transition"><i class="fas fa-file-alt mr-1"></i> ATP & Modul Ajar</a>
+                <a href="guru-absensi.html" class="bg-indigo-900 px-3 py-2 rounded-lg"><i class="fas fa-user-check mr-1"></i> Presensi Siswa</a>
+                <button onclick="logout()" class="bg-red-500 hover:bg-red-600 text-white px-3 py-2 rounded-lg transition"><i class="fas fa-sign-out-alt"></i> Keluar</button>
+            </nav>
+        </div>
+    </header>
+
+    <main class="max-w-7xl mx-auto px-4 py-6 w-full flex-1 space-y-6">
+
+        <!-- Filter Utama Kelas, Tanggal & Mapel -->
+        <div class="bg-white p-5 rounded-xl shadow-md border border-slate-200">
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4 text-xs items-end">
+                <div>
+                    <label class="block font-bold text-slate-700 mb-1">Pilih Kelas / Rombel</label>
+                    <select id="filter-rombel" onchange="muatDataPresensi()" class="w-full p-2.5 border rounded-lg bg-slate-50 font-semibold text-indigo-700"></select>
+                </div>
+                <div>
+                    <label class="block font-bold text-slate-700 mb-1">Tanggal Pertemuan</label>
+                    <input type="date" id="filter-tanggal" onchange="muatDataPresensi()" class="w-full p-2.5 border rounded-lg bg-slate-50">
+                </div>
+                <div>
+                    <label class="block font-bold text-slate-700 mb-1">Mata Pelajaran</label>
+                    <input type="text" id="filter-mapel" onchange="muatDataPresensi()" class="w-full p-2.5 border rounded-lg bg-slate-50">
+                </div>
+                <div class="flex gap-2">
+                    <button onclick="muatDataPresensi()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-2.5 px-4 rounded-lg font-medium transition shadow">
+                        <i class="fas fa-sync-alt mr-1"></i> Muat Data
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Navigasi Sub-Tab: Input Harian vs Rekapitulasi -->
+        <div class="bg-white rounded-xl shadow-md border border-slate-200 overflow-hidden">
+            <div class="flex border-b bg-slate-50 px-4 pt-3 gap-2">
+                <button onclick="switchSubTab('input')" id="btn-tab-input" class="px-4 py-2 text-xs font-bold border-b-2 border-indigo-600 text-indigo-700 bg-white rounded-t-lg">
+                    <i class="fas fa-clipboard-check mr-1"></i> Input Presensi Harian
+                </button>
+                <button onclick="switchSubTab('rekap')" id="btn-tab-rekap" class="px-4 py-2 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-indigo-600">
+                    <i class="fas fa-chart-bar mr-1"></i> Rekapitulasi Kehadiran
+                </button>
+            </div>
+
+            <!-- SUB-TAB 1: INPUT PRESENSI HARIAN -->
+            <div id="panel-input" class="p-6 space-y-4">
+                <div class="flex flex-wrap justify-between items-center gap-2 border-b pb-3">
+                    <div>
+                        <h2 class="text-sm font-bold text-slate-800">Daftar Hadir Siswa <span id="badge-status-tersimpan" class="ml-2 hidden bg-emerald-100 text-emerald-700 text-[10px] px-2 py-0.5 rounded-full">Data Tersimpan</span></h2>
+                        <p class="text-[11px] text-slate-500">H = Hadir | S = Sakit | I = Izin | A = Alpa (Tanpa Keterangan)</p>
+                    </div>
+                    <div class="flex gap-2">
+                        <button type="button" onclick="tandaiSemuaHadir()" class="bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs px-3 py-1.5 rounded-lg font-medium transition">
+                            <i class="fas fa-check-double mr-1"></i> Tandai Semua Hadir (H)
+                        </button>
+                        <button type="button" id="btn-simpan" onclick="simpanPresensi()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs px-4 py-1.5 rounded-lg font-bold transition shadow">
+                            <i class="fas fa-save mr-1"></i> Simpan Presensi
+                        </button>
+                    </div>
+                </div>
+
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse text-xs">
+                        <thead>
+                            <tr class="bg-slate-100 text-slate-700 border-b">
+                                <th class="p-2.5 w-10 text-center">No</th>
+                                <th class="p-2.5 w-28">NISN / NIPD</th>
+                                <th class="p-2.5">Nama Lengkap Siswa</th>
+                                <th class="p-2.5 w-12 text-center">JK</th>
+                                <th class="p-2.5 w-56 text-center">Status Kehadiran</th>
+                                <th class="p-2.5 w-56">Keterangan / Catatan</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tbody-presensi" class="divide-y">
+                            <tr><td colspan="6" class="text-center p-6 text-slate-400">Memuat daftar siswa...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- SUB-TAB 2: REKAPITULASI BULANAN / SEMESTER -->
+            <div id="panel-rekap" class="hidden p-6 space-y-4">
+                <div class="flex flex-wrap justify-between items-center gap-3 border-b pb-3">
+                    <div class="flex items-center gap-2 text-xs">
+                        <label class="font-bold text-slate-700">Periode Rekap:</label>
+                        <select id="rekap-periode" onchange="muatRekapPresensi()" class="p-2 border rounded-lg bg-slate-50 font-medium">
+                            <option value="SEMESTER">Seluruh Semester Aktif</option>
+                            <option value="01">Januari</option>
+                            <option value="02">Februari</option>
+                            <option value="03">Maret</option>
+                            <option value="04">April</option>
+                            <option value="05">Mei</option>
+                            <option value="06">Juni</option>
+                            <option value="07">Juli</option>
+                            <option value="08">Agustus</option>
+                            <option value="09">September</option>
+                            <option value="10">Oktober</option>
+                            <option value="11">November</option>
+                            <option value="12">Desember</option>
+                        </select>
+                    </div>
+                    <div class="flex gap-2">
+                        <button onclick="exportRekapExcel()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs px-3 py-1.5 rounded-lg font-medium transition">
+                            <i class="fas fa-file-excel mr-1"></i> Ekspor Excel
+                        </button>
+                        <button onclick="cetakRekap()" class="bg-slate-700 hover:bg-slate-800 text-white text-xs px-3 py-1.5 rounded-lg font-medium transition">
+                            <i class="fas fa-print mr-1"></i> Cetak Laporan
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Area Cetak Rekap Ber-KOP -->
+                <div id="area-cetak-rekap" class="bg-white p-4 border rounded-lg space-y-4">
+                    <div id="rekap-kop-header"></div>
+
+                    <div class="text-center">
+                        <h3 class="text-sm font-bold uppercase text-slate-800">REKAPITULASI KEHADIRAN PESERTA DIDIK</h3>
+                        <p class="text-xs text-slate-600" id="rekap-subjudul">-</p>
+                    </div>
+
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse border border-slate-300 text-xs">
+                            <thead>
+                                <tr class="bg-slate-100 text-slate-800">
+                                    <th class="p-2 border text-center w-10">No</th>
+                                    <th class="p-2 border w-28">NISN</th>
+                                    <th class="p-2 border">Nama Lengkap Siswa</th>
+                                    <th class="p-2 border text-center w-10">JK</th>
+                                    <th class="p-2 border text-center w-14 bg-emerald-50 text-emerald-800">Hadir</th>
+                                    <th class="p-2 border text-center w-14 bg-amber-50 text-amber-800">Sakit</th>
+                                    <th class="p-2 border text-center w-14 bg-blue-50 text-blue-800">Izin</th>
+                                    <th class="p-2 border text-center w-14 bg-red-50 text-red-800">Alpa</th>
+                                    <th class="p-2 border text-center w-20">Kehadiran</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tbody-rekap" class="divide-y"></tbody>
+                        </table>
+                    </div>
+
+                    <div id="rekap-ttd-footer"></div>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <script>
+        // =========================================================================
+        // KONFIGURASI SUPABASE (Ganti dengan URL & Anon Key project Anda,
+        // atau gunakan variabel global dari file config.js jika sudah ada)
+        // =========================================================================
+        const SUPABASE_URL = window.SUPABASE_URL || 'https://PROJECT_ID_ANDA.supabase.co';
+        const SUPABASE_ANON_KEY = window.SUPABASE_ANON_KEY || 'ANON_KEY_ANDA';
+        const sb = window.sb || supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        let currentUser = null;
+        let profilGuru = null;
+        let profilSekolah = null;
+        let daftarRombel = [];
+        let daftarSiswa = [];
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            // Set tanggal hari ini (WIB)
+            const today = new Date().toLocaleDateString('en-CA');
+            document.getElementById('filter-tanggal').value = today;
+
+            // 1. Cek Sesi Supabase Auth
+            const { data: { session }, error } = await sb.auth.getSession();
+            if (error || !session) {
+                window.location.href = 'login.html';
+                return;
+            }
+            currentUser = session.user;
+
+            // 2. Muat Profil Guru & Profil Sekolah
+            const [resGuru, resSekolah] = await Promise.all([
+                sb.from('guru').select('*').eq('id', currentUser.id).single(),
+                sb.from('sekolah').select('*').limit(1).single()
+            ]);
+
+            if (resGuru.data) {
+                profilGuru = resGuru.data;
+                document.getElementById('filter-mapel').value = profilGuru.mapel || '';
+            } else {
+                alert('Profil guru tidak ditemukan di database.');
+                window.location.href = 'login.html';
+                return;
+            }
+
+            profilSekolah = resSekolah.data || {
+                nama: 'SMP Negeri 1 Indonesia',
+                npsn: '-',
+                kepsek: '-',
+                nip_kepsek: '-',
+                tahun_ajaran: '2025/2026',
+                semester: 'Ganjil'
+            };
+
+            document.getElementById('header-sekolah').innerText = profilSekolah.nama;
+            document.getElementById('header-info').innerText = `${profilGuru.nama} | T.A. ${profilSekolah.tahun_ajaran} (${profilSekolah.semester})`;
+
+            // 3. Muat Daftar Rombel sesuai Tahun Ajaran Aktif
+            const { data: rombelData } = await sb
+                .from('rombel')
+                .select('*')
+                .eq('tahun_ajaran', profilSekolah.tahun_ajaran)
+                .order('nama', { ascending: true });
+
+            daftarRombel = rombelData || [];
+            const selRombel = document.getElementById('filter-rombel');
+            selRombel.innerHTML = '';
+
+            if (daftarRombel.length === 0) {
+                selRombel.innerHTML = `<option value="">Belum ada rombel T.A ${profilSekolah.tahun_ajaran}</option>`;
+                document.getElementById('tbody-presensi').innerHTML = `<tr><td colspan="6" class="text-center p-6 text-slate-400">Admin belum membuat rombel pada Tahun Ajaran ${profilSekolah.tahun_ajaran}.</td></tr>`;
+                return;
+            }
+
+            daftarRombel.forEach(r => {
+                selRombel.innerHTML += `<option value="${r.id}">${r.tingkat} - Kelas ${r.nama}</option>`;
+            });
+
+            await muatDataPresensi();
+        });
+
+        async function muatDataPresensi() {
+            const rombelId = document.getElementById('filter-rombel').value;
+            const tanggal = document.getElementById('filter-tanggal').value;
+            const mapel = document.getElementById('filter-mapel').value.trim();
+            const tbody = document.getElementById('tbody-presensi');
+            const badge = document.getElementById('badge-status-tersimpan');
+
+            if (!rombelId || !tanggal) return;
+
+            tbody.innerHTML = `<tr><td colspan="6" class="text-center p-6 text-slate-400"><i class="fas fa-spinner fa-spin mr-2"></i>Memuat data siswa & presensi...</td></tr>`;
+
+            // Ambil daftar siswa pada rombel terpilih
+            const { data: siswaData, error: errSiswa } = await sb
+                .from('siswa')
+                .select('*')
+                .eq('rombel_id', rombelId)
+                .order('nama', { ascending: true });
+
+            if (errSiswa) {
+                tbody.innerHTML = `<tr><td colspan="6" class="text-center p-4 text-red-500">Gagal memuat siswa: ${errSiswa.message}</td></tr>`;
+                return;
+            }
+
+            daftarSiswa = siswaData || [];
+            if (daftarSiswa.length === 0) {
+                badge.classList.add('hidden');
+                tbody.innerHTML = `<tr><td colspan="6" class="text-center p-6 text-slate-400">Belum ada data siswa di kelas ini.</td></tr>`;
+                return;
+            }
+
+            // Cek apakah presensi sudah ada pada tanggal & mapel ini
+            const { data: existingPresensi } = await sb
+                .from('presensi')
+                .select('*')
+                .eq('rombel_id', rombelId)
+                .eq('tanggal', tanggal)
+                .eq('mapel', mapel);
+
+            const mapExisting = {};
+            (existingPresensi || []).forEach(p => {
+                mapExisting[p.siswa_id] = p;
+            });
+
+            if (existingPresensi && existingPresensi.length > 0) {
+                badge.classList.remove('hidden');
+            } else {
+                badge.classList.add('hidden');
+            }
+
+            tbody.innerHTML = '';
+            daftarSiswa.forEach((s, idx) => {
+                const record = mapExisting[s.id];
+                const status = record ? record.status : 'H';
+                const ket = record ? (record.keterangan || '') : '';
+
+                tbody.innerHTML += `
+                    <tr class="hover:bg-slate-50" data-siswa-id="${s.id}">
+                        <td class="p-2.5 text-center">${idx + 1}</td>
+                        <td class="p-2.5 font-mono text-[11px]">${s.nisn}<br><span class="text-slate-400">${s.nipd || '-'}</span></td>
+                        <td class="p-2.5 font-semibold text-slate-800">${s.nama}</td>
+                        <td class="p-2.5 text-center font-bold text-slate-600">${s.jk}</td>
+                        <td class="p-2.5">
+                            <div class="flex justify-center gap-2">
+                                ${renderRadioStatus(s.id, 'H', 'Hadir', status, 'emerald')}
+                                ${renderRadioStatus(s.id, 'S', 'Sakit', status, 'amber')}
+                                ${renderRadioStatus(s.id, 'I', 'Izin', status, 'blue')}
+                                ${renderRadioStatus(s.id, 'A', 'Alpa', status, 'red')}
+                            </div>
+                        </td>
+                        <td class="p-2.5">
+                            <input type="text" id="ket-${s.id}" value="${ket}" placeholder="Catatan opsional..." class="w-full p-1.5 border rounded text-xs bg-white">
+                        </td>
+                    </tr>
+                `;
+            });
+
+            // Perbarui tab rekap jika sedang dibuka
+            if (!document.getElementById('panel-rekap').classList.contains('hidden')) {
+                await muatRekapPresensi();
+            }
+        }
+
+        function renderRadioStatus(siswaId, kode, label, currentStatus, color) {
+            const checked = currentStatus === kode ? 'checked' : '';
+            return `
+                <label class="cursor-pointer inline-flex items-center gap-1 px-2 py-1 rounded border text-[11px] font-bold bg-${color}-50 border-${color}-200 text-${color}-700">
+                    <input type="radio" name="status-${siswaId}" value="${kode}" ${checked} class="accent-${color}-600">
+                    ${kode}
+                </label>
+            `;
+        }
+
+        function tandaiSemuaHadir() {
+            daftarSiswa.forEach(s => {
+                const radioH = document.querySelector(`input[name="status-${s.id}"][value="H"]`);
+                if (radioH) radioH.checked = true;
+            });
+        }
+
+        async function simpanPresensi() {
+            const rombelId = document.getElementById('filter-rombel').value;
+            const tanggal = document.getElementById('filter-tanggal').value;
+            const mapel = document.getElementById('filter-mapel').value.trim();
+
+            if (!rombelId || !tanggal || daftarSiswa.length === 0) {
+                alert('Pastikan kelas, tanggal, dan daftar siswa sudah tersedia.');
+                return;
+            }
+
+            const btn = document.getElementById('btn-simpan');
+            btn.disabled = true;
+            btn.innerHTML = `<i class="fas fa-spinner fa-spin mr-1"></i> Menyimpan...`;
+
+            const payload = daftarSiswa.map(s => {
+                const checkedRadio = document.querySelector(`input[name="status-${s.id}"]:checked`);
+                const status = checkedRadio ? checkedRadio.value : 'H';
+                const keterangan = document.getElementById(`ket-${s.id}`).value.trim();
+
+                return {
+                    rombel_id: rombelId,
+                    siswa_id: s.id,
+                    guru_id: profilGuru.id,
+                    mapel: mapel,
+                    tanggal: tanggal,
+                    tahun_ajaran: profilSekolah.tahun_ajaran,
+                    semester: profilSekolah.semester,
+                    status: status,
+                    keterangan: keterangan,
+                    updated_at: new Date().toISOString()
+                };
+            });
+
+            const { error } = await sb
+                .from('presensi')
+                .upsert(payload, { onConflict: 'rombel_id,siswa_id,tanggal,mapel' });
+
+            btn.disabled = false;
+            btn.innerHTML = `<i class="fas fa-save mr-1"></i> Simpan Presensi`;
+
+            if (error) {
+                alert('Gagal menyimpan presensi: ' + error.message);
+            } else {
+                document.getElementById('badge-status-tersimpan').classList.remove('hidden');
+                alert('Data presensi berhasil disimpan ke Supabase!');
+            }
+        }
+
+        // =========================================================================
+        // REKAPITULASI BULANAN / SEMESTER
+        // =========================================================================
+        async function muatRekapPresensi() {
+            const rombelId = document.getElementById('filter-rombel').value;
+            const mapel = document.getElementById('filter-mapel').value.trim();
+            const periode = document.getElementById('rekap-periode').value;
+            const tbody = document.getElementById('tbody-rekap');
+
+            if (!rombelId) return;
+
+            const rombelObj = daftarRombel.find(r => r.id === rombelId) || { nama: '-', tingkat: '-' };
+            const namaBulan = document.getElementById('rekap-periode').options[document.getElementById('rekap-periode').selectedIndex].text;
+
+            // Render KOP & TTD
+            document.getElementById('rekap-kop-header').innerHTML = profilSekolah.img_kop
+                ? `<div class="text-center mb-3"><img src="${profilSekolah.img_kop}" class="max-h-24 mx-auto object-contain"></div>`
+                : `<div class="text-center border-b-2 border-slate-800 pb-2 mb-3"><h2 class="text-base font-bold uppercase">${profilSekolah.nama}</h2><p class="text-[10px]">NPSN: ${profilSekolah.npsn || '-'}</p></div>`;
+
+            document.getElementById('rekap-subjudul').innerText =
+                `Kelas: ${rombelObj.nama} (${rombelObj.tingkat}) | Mapel: ${mapel || 'Semua'} | Periode: ${namaBulan} | T.A. ${profilSekolah.tahun_ajaran} (${profilSekolah.semester})`;
+
+            const ttdKepsek = profilSekolah.img_ttd ? `<img src="${profilSekolah.img_ttd}" class="h-14 mx-auto object-contain my-1">` : `<div class="h-12"></div>`;
+            document.getElementById('rekap-ttd-footer').innerHTML = `
+                <div class="grid grid-cols-2 text-center text-xs mt-8 pt-4">
+                    <div>
+                        <p>Mengetahui,</p>
+                        <p class="font-bold">Kepala ${profilSekolah.nama}</p>
+                        ${ttdKepsek}
+                        <p class="font-bold underline">${profilSekolah.kepsek || '-'}</p>
+                        <p>NIP. ${profilSekolah.nip_kepsek || '-'}</p>
+                    </div>
+                    <div>
+                        <p>Guru Mata Pelajaran,</p>
+                        <div class="h-14"></div>
+                        <p class="font-bold underline">${profilGuru.nama}</p>
+                        <p>NIP. ${profilGuru.username}</p>
+                    </div>
+                </div>
+            `;
+
+            // Query data presensi dari Supabase
+            let query = sb
+                .from('presensi')
+                .select('siswa_id, tanggal, status')
+                .eq('rombel_id', rombelId)
+                .eq('tahun_ajaran', profilSekolah.tahun_ajaran)
+                .eq('semester', profilSekolah.semester);
+
+            if (mapel) {
+                query = query.eq('mapel', mapel);
+            }
+
+            const { data: logs, error } = await query;
+            if (error) {
+                tbody.innerHTML = `<tr><td colspan="9" class="text-center p-4 text-red-500">Gagal memuat rekap: ${error.message}</td></tr>`;
+                return;
+            }
+
+            // Filter bulan jika dipilih spesifik
+            const filteredLogs = (logs || []).filter(item => {
+                if (periode === 'SEMESTER') return true;
+                const bulanItem = item.tanggal.split('-')[1]; // format YYYY-MM-DD
+                return bulanItem === periode;
+            });
+
+            // Hitung agregasi per siswa
+            const stats = {};
+            daftarSiswa.forEach(s => {
+                stats[s.id] = { H: 0, S: 0, I: 0, A: 0 };
+            });
+
+            filteredLogs.forEach(row => {
+                if (stats[row.siswa_id] && stats[row.siswa_id][row.status] !== undefined) {
+                    stats[row.siswa_id][row.status]++;
+                }
+            });
+
+            tbody.innerHTML = '';
+            daftarSiswa.forEach((s, idx) => {
+                const st = stats[s.id] || { H: 0, S: 0, I: 0, A: 0 };
+                const total = st.H + st.S + st.I + st.A;
+                const persen = total > 0 ? Math.round((st.H / total) * 100) : 100;
+
+                tbody.innerHTML += `
+                    <tr>
+                        <td class="p-2 border text-center">${idx + 1}</td>
+                        <td class="p-2 border font-mono">${s.nisn}</td>
+                        <td class="p-2 border font-medium">${s.nama}</td>
+                        <td class="p-2 border text-center">${s.jk}</td>
+                        <td class="p-2 border text-center font-bold text-emerald-700">${st.H}</td>
+                        <td class="p-2 border text-center font-bold text-amber-700">${st.S}</td>
+                        <td class="p-2 border text-center font-bold text-blue-700">${st.I}</td>
+                        <td class="p-2 border text-center font-bold text-red-700">${st.A}</td>
+                        <td class="p-2 border text-center font-bold">${persen}%</td>
+                    </tr>
+                `;
+            });
+        }
+
+        function switchSubTab(tab) {
+            const btnInput = document.getElementById('btn-tab-input');
+            const btnRekap = document.getElementById('btn-tab-rekap');
+            const panelInput = document.getElementById('panel-input');
+            const panelRekap = document.getElementById('panel-rekap');
+
+            if (tab === 'input') {
+                btnInput.className = 'px-4 py-2 text-xs font-bold border-b-2 border-indigo-600 text-indigo-700 bg-white rounded-t-lg';
+                btnRekap.className = 'px-4 py-2 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-indigo-600';
+                panelInput.classList.remove('hidden');
+                panelRekap.classList.add('hidden');
+            } else {
+                btnRekap.className = 'px-4 py-2 text-xs font-bold border-b-2 border-indigo-600 text-indigo-700 bg-white rounded-t-lg';
+                btnInput.className = 'px-4 py-2 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-indigo-600';
+                panelRekap.classList.remove('hidden');
+                panelInput.classList.add('hidden');
+                muatRekapPresensi();
+            }
+        }
+
+        function exportRekapExcel() {
+            const html = document.getElementById('area-cetak-rekap').innerHTML;
+            const blob = new Blob(['\ufeff' + html], { type: 'application/vnd.ms-excel' });
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = `Rekap_Presensi_${new Date().toISOString().slice(0, 10)}.xls`;
+            a.click();
+        }
+
+        function cetakRekap() {
+            const content = document.getElementById('area-cetak-rekap').innerHTML;
+            const win = window.open('', '', 'height=650,width=900');
+            win.document.write('<html><head><title>Cetak Rekap Presensi</title><script src="https://cdn.tailwindcss.com"><\/script></head><body class="p-8">');
+            win.document.write(content);
+            win.document.write('</body></html>');
+            win.document.close();
+            setTimeout(() => win.print(), 500);
+        }
+
+        async function logout() {
+            await sb.auth.signOut();
+            window.location.href = 'login.html';
+        }
+    </script>
+</body>
+</html>
