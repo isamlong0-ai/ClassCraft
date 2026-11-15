@@ -94,9 +94,13 @@
     <script>
         let session = CC.getSession();
 
-        if (!session || session.role !== 'admin') {
-            window.location.replace('login.html');
-            throw new Error('Akses ditolak: silakan login sebagai admin.');
+        if (!session) {
+            window.location.replace('index.html');
+            throw new Error('Akses ditolak: silakan login terlebih dahulu.');
+        }
+        if (session.role !== 'admin') {
+            window.location.replace(CC.homeFor(session.role));
+            throw new Error('Akses ditolak: halaman ini khusus admin.');
         }
 
         let dbUsers = [];
@@ -265,7 +269,7 @@
             rombel.siswa.forEach((s, idx) => { table += `<tr><td>${idx+1}</td><td>'${s.nisn}</td><td>'${s.nipd}</td><td>${s.nama}</td><td>${s.jk}</td></tr>`; }); table += `</table>`; const blob = new Blob(['\ufeff' + table], { type: 'application/vnd.ms-excel' }); const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `Siswa_${rombel.nama}.xls`; a.click();
         }
 
-        function logout() { CC.logout().finally(() => { window.location.href = 'login.html'; }); }
+        function logout() { CC.logout().finally(() => { window.location.href = 'index.html'; }); }
     </script>
 </body>
 </html>

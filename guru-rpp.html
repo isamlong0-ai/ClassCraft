@@ -135,9 +135,13 @@
     <script>
         let session = CC.getSession();
 
-        if (!session || session.role !== 'guru') {
-            window.location.replace('login.html');
-            throw new Error('Akses ditolak: silakan login sebagai guru.');
+        if (!session) {
+            window.location.replace('index.html');
+            throw new Error('Akses ditolak: silakan login terlebih dahulu.');
+        }
+        if (session.role !== 'guru') {
+            window.location.replace(CC.homeFor(session.role));
+            throw new Error('Akses ditolak: halaman ini khusus guru.');
         }
 
         let dbSekolah = Object.assign({}, CC.defaults.sekolah);
@@ -467,7 +471,7 @@ Peserta didik mampu menginisiasi kegiatan bersama dalam merawat keberagaman suku
         }
 
         function logout() {
-            CC.logout().finally(() => { window.location.href = 'login.html'; });
+            CC.logout().finally(() => { window.location.href = 'index.html'; });
         }
     </script>
 </body>

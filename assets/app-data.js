@@ -371,9 +371,12 @@
     if (sb) {
         (function () {
             var path = (window.location.pathname || '').toLowerCase();
-            if (path.indexOf('login.html') !== -1) return;
+            // Lewati revalidasi di halaman login (index.html / login.html / root).
+            var isLoginPage = path.indexOf('index.html') !== -1 || path.indexOf('login') !== -1 ||
+                              path === '' || path === '/' || /\/$/.test(path);
+            if (isLoginPage) return;
             getAuthUser().then(function (u) {
-                if (!u) window.location.replace('login.html');
+                if (!u) window.location.replace('index.html');
             });
         })();
     }

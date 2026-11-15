@@ -81,9 +81,13 @@
     <script>
         let session = CC.getSession();
 
-        if (!session || session.role !== 'admin') {
-            window.location.replace('login.html');
-            throw new Error('Akses ditolak: silakan login sebagai admin.');
+        if (!session) {
+            window.location.replace('index.html');
+            throw new Error('Akses ditolak: silakan login terlebih dahulu.');
+        }
+        if (session.role !== 'admin') {
+            window.location.replace(CC.homeFor(session.role));
+            throw new Error('Akses ditolak: halaman ini khusus admin.');
         }
 
         let dbUsers = [];
@@ -209,7 +213,7 @@
             const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'Data_Guru_SMP.xls'; a.click();
         }
 
-        function logout() { CC.logout().finally(() => { window.location.href = 'login.html'; }); }
+        function logout() { CC.logout().finally(() => { window.location.href = 'index.html'; }); }
     </script>
 </body>
 </html>

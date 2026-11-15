@@ -121,9 +121,13 @@
     <script>
         let session = CC.getSession();
 
-        if (!session || session.role !== 'admin') {
-            window.location.replace('login.html');
-            throw new Error('Akses ditolak: silakan login sebagai admin.');
+        if (!session) {
+            window.location.replace('index.html');
+            throw new Error('Akses ditolak: silakan login terlebih dahulu.');
+        }
+        if (session.role !== 'admin') {
+            window.location.replace(CC.homeFor(session.role));
+            throw new Error('Akses ditolak: halaman ini khusus admin.');
         }
 
         let dbSekolah = Object.assign({}, CC.defaults.sekolah);
@@ -225,7 +229,7 @@
         }
 
         function logout() {
-            CC.logout().finally(() => { window.location.href = 'login.html'; });
+            CC.logout().finally(() => { window.location.href = 'index.html'; });
         }
     </script>
 </body>

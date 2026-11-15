@@ -1,0 +1,15 @@
+# Konfigurasi lokal agen/editor (jangan dibagikan)
+.opencode/
+
+# OS
+Thumbs.db
+Desktop.ini
+.DS_Store
+
+# Editor
+.vscode/
+.idea/
+
+# Log & berkas sementara
+*.log
+*.tmp
