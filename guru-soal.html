@@ -1,0 +1,989 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Guru - Bank Soal & Asesmen</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body class="bg-slate-100 font-sans text-slate-800 min-h-screen flex flex-col">
+
+    <!-- Topbar -->
+    <header class="bg-indigo-700 text-white shadow-lg sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 py-3 flex flex-col md:flex-row justify-between items-center gap-2">
+            <div class="flex items-center space-x-3">
+                <i class="fas fa-shapes text-2xl text-amber-300"></i>
+                <div>
+                    <h1 class="text-lg font-bold leading-tight" id="header-sekolah">ClassCraft Guru</h1>
+                    <p class="text-[10px] text-indigo-200" id="header-info">Memuat sesi...</p>
+                </div>
+            </div>
+            <nav class="flex flex-wrap gap-1.5 text-xs font-medium">
+                <a href="guru-dashboard.html" class="hover:bg-indigo-600 px-3 py-2 rounded-lg transition"><i class="fas fa-user-circle mr-1"></i> Informasi Saya</a>
+                <a href="guru-rpp.html" class="hover:bg-indigo-600 px-3 py-2 rounded-lg transition"><i class="fas fa-file-alt mr-1"></i> ATP & Modul Ajar</a>
+                <a href="guru-absensi.html" class="hover:bg-indigo-600 px-3 py-2 rounded-lg transition"><i class="fas fa-user-check mr-1"></i> Presensi Siswa</a>
+                <a href="guru-jurnal.html" class="hover:bg-indigo-600 px-3 py-2 rounded-lg transition"><i class="fas fa-book mr-1"></i> Jurnal Mengajar</a>
+                <a href="guru-soal.html" class="bg-indigo-900 px-3 py-2 rounded-lg"><i class="fas fa-tasks mr-1"></i> Bank Soal</a>
+                <button onclick="logout()" class="bg-red-500 hover:bg-red-600 text-white px-3 py-2 rounded-lg transition"><i class="fas fa-sign-out-alt"></i> Keluar</button>
+            </nav>
+        </div>
+    </header>
+
+    <main class="max-w-7xl mx-auto px-4 py-6 w-full flex-1 space-y-6">
+
+        <!-- Baris Arsip Paket Soal Tersimpan -->
+        <div class="bg-white p-4 rounded-xl shadow-md border border-slate-200 flex flex-wrap justify-between items-center gap-3">
+            <div class="flex flex-wrap items-center gap-2 text-xs">
+                <span class="font-bold text-indigo-700"><i class="fas fa-folder-open mr-1"></i> Paket Soal Tersimpan:</span>
+                <select id="select-arsip-paket" onchange="pilihArsipPaket(this.value)" class="p-2 border rounded-lg bg-slate-50 font-medium min-w-[260px]">
+                    <option value="">-- Buat Paket Soal Baru --</option>
+                </select>
+                <button type="button" onclick="buatPaketBaru()" class="bg-slate-200 hover:bg-slate-300 text-slate-700 px-3 py-2 rounded-lg font-medium transition">
+                    <i class="fas fa-file-medical mr-1"></i> Paket Baru
+                </button>
+                <button type="button" id="btn-hapus-paket" onclick="hapusPaketAktif()" class="hidden bg-red-100 hover:bg-red-200 text-red-700 px-3 py-2 rounded-lg font-medium transition">
+                    <i class="fas fa-trash mr-1"></i> Hapus Paket
+                </button>
+            </div>
+
+            <div class="flex gap-2">
+                <button type="button" onclick="muatContohSoal()" class="bg-amber-100 hover:bg-amber-200 text-amber-800 text-xs px-3 py-2 rounded-lg font-semibold transition">
+                    <i class="fas fa-magic mr-1"></i> Isi Contoh Soal
+                </button>
+                <button type="button" id="btn-simpan-paket" onclick="simpanPaketKeSupabase()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs px-4 py-2 rounded-lg font-bold transition shadow">
+                    <i class="fas fa-cloud-upload-alt mr-1"></i> Simpan Paket ke Database
+                </button>
+            </div>
+        </div>
+
+        <!-- Navigasi Sub-Tab 4 Dokumen Asesmen -->
+        <div class="bg-white rounded-xl shadow-md border border-slate-200 overflow-hidden">
+            <div class="flex flex-wrap border-b bg-slate-50 px-4 pt-3 gap-1.5">
+                <button onclick="switchSubTab('editor')" id="btn-tab-editor" class="px-4 py-2 text-xs font-bold border-b-2 border-indigo-600 text-indigo-700 bg-white rounded-t-lg">
+                    <i class="fas fa-edit mr-1"></i> 1. Penyusunan Butir Soal (<span id="badge-jumlah-soal">0</span>)
+                </button>
+                <button onclick="switchSubTab('kisikisi')" id="btn-tab-kisikisi" class="px-4 py-2 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-indigo-600">
+                    <i class="fas fa-table mr-1"></i> 2. Kisi-Kisi Soal
+                </button>
+                <button onclick="switchSubTab('naskah')" id="btn-tab-naskah" class="px-4 py-2 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-indigo-600">
+                    <i class="fas fa-file-alt mr-1"></i> 3. Naskah Soal Ujian
+                </button>
+                <button onclick="switchSubTab('kunci')" id="btn-tab-kunci" class="px-4 py-2 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-indigo-600">
+                    <i class="fas fa-key mr-1"></i> 4. Kunci Jawaban & Penskoran
+                </button>
+            </div>
+
+            <!-- =====================================================================
+                 SUB-TAB 1: EDITOR METADATA & BUTIR SOAL
+            ====================================================================== -->
+            <div id="panel-editor" class="p-6 space-y-6">
+                
+                <!-- Identitas Paket Asesmen -->
+                <div class="bg-indigo-50/60 p-4 rounded-xl border border-indigo-100 space-y-3 text-xs">
+                    <h2 class="font-bold text-indigo-800 border-b border-indigo-200 pb-1.5">
+                        <i class="fas fa-info-circle mr-1"></i> Identitas Dokumen Asesmen
+                    </h2>
+                    <div class="grid grid-cols-1 md:grid-cols-5 gap-3">
+                        <div class="md:col-span-2">
+                            <label class="block font-semibold text-slate-700 mb-1">Jenis Asesmen / Ujian</label>
+                            <select id="meta-jenis" class="w-full p-2 border rounded-lg bg-white font-semibold text-indigo-700">
+                                <option value="Sumatif Lingkup Materi (Harian)">Sumatif Lingkup Materi (Harian)</option>
+                                <option value="Sumatif Tengah Semester (STS)">Sumatif Tengah Semester (STS)</option>
+                                <option value="Sumatif Akhir Semester (SAS)">Sumatif Akhir Semester (SAS)</option>
+                                <option value="Sumatif Akhir Tahun (SAT)">Sumatif Akhir Tahun (SAT)</option>
+                                <option value="Asesmen Diagnostik Awal">Asesmen Diagnostik Awal</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block font-semibold text-slate-700 mb-1">Tingkat / Fase</label>
+                            <select id="meta-tingkat" class="w-full p-2 border rounded-lg bg-white">
+                                <option value="Kelas 7">Kelas 7 (Fase D)</option>
+                                <option value="Kelas 8">Kelas 8 (Fase D)</option>
+                                <option value="Kelas 9">Kelas 9 (Fase D)</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block font-semibold text-slate-700 mb-1">Tanggal Pelaksanaan</label>
+                            <input type="date" id="meta-tanggal" class="w-full p-2 border rounded-lg bg-white">
+                        </div>
+                        <div>
+                            <label class="block font-semibold text-slate-700 mb-1">Alokasi Waktu</label>
+                            <input type="text" id="meta-waktu" value="90 Menit" class="w-full p-2 border rounded-lg bg-white">
+                        </div>
+                        <div class="md:col-span-5">
+                            <label class="block font-semibold text-slate-700 mb-1">Mata Pelajaran</label>
+                            <input type="text" id="meta-mapel" class="w-full p-2 border rounded-lg bg-white">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Form Tambah / Edit Butir Soal -->
+                <div class="bg-slate-50 p-5 rounded-xl border border-slate-200 space-y-4 text-xs">
+                    <div class="flex justify-between items-center border-b pb-2">
+                        <h3 class="font-bold text-slate-800" id="judul-form-soal">
+                            <i class="fas fa-plus-circle text-indigo-600 mr-1"></i> Tambah Butir Soal Baru
+                        </h3>
+                        <button type="button" id="btn-batal-edit-soal" onclick="resetFormButir()" class="hidden text-red-600 hover:underline font-medium">
+                            <i class="fas fa-times mr-1"></i> Batal Edit Butir
+                        </button>
+                    </div>
+
+                    <form onsubmit="simpanButirSoal(event)" class="space-y-3">
+                        <input type="hidden" id="edit-index-soal" value="-1">
+
+                        <div class="grid grid-cols-1 md:grid-cols-4 gap-3">
+                            <div>
+                                <label class="block font-bold text-slate-700 mb-1">Bentuk Soal</label>
+                                <select id="soal-tipe" onchange="toggleOpsiPG()" class="w-full p-2 border rounded-lg bg-white font-semibold">
+                                    <option value="PG">Pilihan Ganda (PG)</option>
+                                    <option value="URAIAN">Uraian / Esai</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block font-bold text-slate-700 mb-1">Level Kognitif</label>
+                                <select id="soal-level" class="w-full p-2 border rounded-lg bg-white">
+                                    <option value="L1 (LotS - Pengetahuan/Pemahaman)">L1 (LotS - C1/C2)</option>
+                                    <option value="L2 (MotS - Penerapan)">L2 (MotS - C3)</option>
+                                    <option value="L3 (HotS - Penalaran/Analisis)">L3 (HotS - C4/C5/C6)</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block font-bold text-slate-700 mb-1">Bobot Skor Maksimal</label>
+                                <input type="number" id="soal-skor" min="1" max="100" value="2" required class="w-full p-2 border rounded-lg bg-white">
+                            </div>
+                            <div>
+                                <label class="block font-bold text-slate-700 mb-1">Tujuan Pembelajaran / Materi</label>
+                                <input type="text" id="soal-tp" required placeholder="Contoh: TP 1.1 Sejarah Pancasila" class="w-full p-2 border rounded-lg bg-white">
+                            </div>
+                        </div>
+
+                        <div>
+                            <label class="block font-bold text-slate-700 mb-1">Indikator Soal (Untuk Kisi-Kisi)</label>
+                            <input type="text" id="soal-indikator" required placeholder="Contoh: Disajikan ilustrasi sidang BPUPKI, peserta didik dapat menentukan tokoh perumus dasar negara." class="w-full p-2 border rounded-lg bg-white">
+                        </div>
+
+                        <div>
+                            <label class="block font-bold text-slate-700 mb-1">Naskah Pertanyaan / Stimulus Soal</label>
+                            <textarea id="soal-pertanyaan" rows="3" required placeholder="Tuliskan teks pertanyaan di sini..." class="w-full p-2.5 border rounded-lg bg-white"></textarea>
+                        </div>
+
+                        <!-- Area Opsi Pilihan Ganda -->
+                        <div id="box-opsi-pg" class="grid grid-cols-1 md:grid-cols-2 gap-3 bg-white p-3.5 rounded-lg border">
+                            <div>
+                                <label class="block font-semibold text-slate-600 mb-1">Pilihan A</label>
+                                <input type="text" id="soal-opsi-a" placeholder="Teks jawaban A" class="w-full p-2 border rounded text-xs">
+                            </div>
+                            <div>
+                                <label class="block font-semibold text-slate-600 mb-1">Pilihan B</label>
+                                <input type="text" id="soal-opsi-b" placeholder="Teks jawaban B" class="w-full p-2 border rounded text-xs">
+                            </div>
+                            <div>
+                                <label class="block font-semibold text-slate-600 mb-1">Pilihan C</label>
+                                <input type="text" id="soal-opsi-c" placeholder="Teks jawaban C" class="w-full p-2 border rounded text-xs">
+                            </div>
+                            <div>
+                                <label class="block font-semibold text-slate-600 mb-1">Pilihan D</label>
+                                <input type="text" id="soal-opsi-d" placeholder="Teks jawaban D" class="w-full p-2 border rounded text-xs">
+                            </div>
+                            <div class="md:col-span-2">
+                                <label class="block font-bold text-emerald-700 mb-1">Kunci Jawaban Benar (PG)</label>
+                                <select id="soal-kunci-pg" class="w-full md:w-48 p-2 border border-emerald-300 rounded-lg bg-emerald-50 font-bold text-emerald-800">
+                                    <option value="A">A</option>
+                                    <option value="B">B</option>
+                                    <option value="C">C</option>
+                                    <option value="D">D</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- Area Kunci Jawaban Uraian -->
+                        <div id="box-kunci-uraian" class="hidden bg-white p-3.5 rounded-lg border">
+                            <label class="block font-bold text-emerald-700 mb-1">Kunci Jawaban & Pedoman Penskoran Uraian</label>
+                            <textarea id="soal-kunci-uraian" rows="2" placeholder="Tuliskan poin-poin jawaban benar beserta pembagian skornya..." class="w-full p-2 border border-emerald-300 rounded-lg bg-emerald-50/40 text-xs"></textarea>
+                        </div>
+
+                        <div class="flex justify-end">
+                            <button type="submit" id="btn-tambah-butir" class="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2 rounded-lg font-bold transition shadow">
+                                <i class="fas fa-plus mr-1"></i> Masukkan ke Daftar Soal
+                            </button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Tabel Daftar Butir Soal dalam Paket -->
+                <div class="space-y-2">
+                    <div class="flex justify-between items-center border-b pb-2">
+                        <h3 class="text-sm font-bold text-slate-800">Daftar Butir Soal Tersusun</h3>
+                        <span class="text-xs font-semibold text-indigo-700" id="info-total-skor">Total Skor Maksimal: 0</span>
+                    </div>
+
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse text-xs">
+                            <thead>
+                                <tr class="bg-slate-100 text-slate-700 border-b">
+                                    <th class="p-2.5 w-12 text-center">No</th>
+                                    <th class="p-2.5 w-24">Bentuk</th>
+                                    <th class="p-2.5 w-28">Level</th>
+                                    <th class="p-2.5">TP / Indikator & Pertanyaan</th>
+                                    <th class="p-2.5 w-24 text-center">Kunci / Skor</th>
+                                    <th class="p-2.5 w-28 text-center">Aksi</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tbody-daftar-soal" class="divide-y">
+                                <tr><td colspan="6" class="text-center p-6 text-slate-400">Belum ada butir soal. Tambahkan melalui form di atas atau klik "Isi Contoh Soal".</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- =====================================================================
+                 SUB-TAB 2: KISI-KISI PENULISAN SOAL
+            ====================================================================== -->
+            <div id="panel-kisikisi" class="hidden p-6 space-y-4">
+                <div class="flex justify-between items-center border-b pb-3">
+                    <h3 class="text-sm font-bold text-slate-800">Preview Kisi-Kisi Penulisan Soal</h3>
+                    <div class="flex gap-2">
+                        <button onclick="exportWord('area-cetak-kisikisi', 'Kisi_Kisi_Soal')" class="bg-blue-600 hover:bg-blue-700 text-white text-xs px-3 py-1.5 rounded-lg font-medium transition">
+                            <i class="fas fa-file-word mr-1"></i> Ekspor Word
+                        </button>
+                        <button onclick="exportExcel('area-cetak-kisikisi', 'Kisi_Kisi_Soal')" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs px-3 py-1.5 rounded-lg font-medium transition">
+                            <i class="fas fa-file-excel mr-1"></i> Ekspor Excel
+                        </button>
+                        <button onclick="cetakDokumen('area-cetak-kisikisi', 'Cetak Kisi-Kisi Soal')" class="bg-slate-700 hover:bg-slate-800 text-white text-xs px-3 py-1.5 rounded-lg font-medium transition">
+                            <i class="fas fa-print mr-1"></i> Cetak
+                        </button>
+                    </div>
+                </div>
+                <div id="area-cetak-kisikisi" class="bg-white p-6 border rounded-lg text-xs space-y-4"></div>
+            </div>
+
+            <!-- =====================================================================
+                 SUB-TAB 3: NASKAH SOAL UJIAN RESMI
+            ====================================================================== -->
+            <div id="panel-naskah" class="hidden p-6 space-y-4">
+                <div class="flex justify-between items-center border-b pb-3">
+                    <h3 class="text-sm font-bold text-slate-800">Preview Lembar Naskah Soal Ujian</h3>
+                    <div class="flex gap-2">
+                        <button onclick="exportWord('area-cetak-naskah', 'Naskah_Soal_Ujian')" class="bg-blue-600 hover:bg-blue-700 text-white text-xs px-3 py-1.5 rounded-lg font-medium transition">
+                            <i class="fas fa-file-word mr-1"></i> Ekspor Word
+                        </button>
+                        <button onclick="cetakDokumen('area-cetak-naskah', 'Cetak Naskah Soal')" class="bg-slate-700 hover:bg-slate-800 text-white text-xs px-3 py-1.5 rounded-lg font-medium transition">
+                            <i class="fas fa-print mr-1"></i> Cetak Soal
+                        </button>
+                    </div>
+                </div>
+                <div id="area-cetak-naskah" class="bg-white p-8 border rounded-lg text-xs space-y-4"></div>
+            </div>
+
+            <!-- =====================================================================
+                 SUB-TAB 4: KUNCI JAWABAN & PEDOMAN PENSKORAN
+            ====================================================================== -->
+            <div id="panel-kunci" class="hidden p-6 space-y-4">
+                <div class="flex justify-between items-center border-b pb-3">
+                    <h3 class="text-sm font-bold text-slate-800">Preview Kunci Jawaban & Pedoman Penskoran</h3>
+                    <div class="flex gap-2">
+                        <button onclick="exportWord('area-cetak-kunci', 'Kunci_Jawaban_Penskoran')" class="bg-blue-600 hover:bg-blue-700 text-white text-xs px-3 py-1.5 rounded-lg font-medium transition">
+                            <i class="fas fa-file-word mr-1"></i> Ekspor Word
+                        </button>
+                        <button onclick="cetakDokumen('area-cetak-kunci', 'Cetak Kunci Jawaban')" class="bg-slate-700 hover:bg-slate-800 text-white text-xs px-3 py-1.5 rounded-lg font-medium transition">
+                            <i class="fas fa-print mr-1"></i> Cetak Kunci
+                        </button>
+                    </div>
+                </div>
+                <div id="area-cetak-kunci" class="bg-white p-6 border rounded-lg text-xs space-y-4"></div>
+            </div>
+
+        </div>
+
+    </main>
+
+    <script>
+        // =========================================================================
+        // KONFIGURASI SUPABASE
+        // =========================================================================
+        const SUPABASE_URL = window.SUPABASE_URL || 'https://PROJECT_ID_ANDA.supabase.co';
+        const SUPABASE_ANON_KEY = window.SUPABASE_ANON_KEY || 'ANON_KEY_ANDA';
+        const sb = window.sb || supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        let currentUser = null;
+        let profilGuru = null;
+        let profilSekolah = null;
+        let arsipPaket = [];
+        let activePaketId = null;
+        let daftarSoal = [];
+
+        function esc(str) {
+            return String(str || '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;');
+        }
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            document.getElementById('meta-tanggal').value = new Date().toLocaleDateString('en-CA');
+
+            // 1. Cek Sesi Login
+            const { data: { session }, error } = await sb.auth.getSession();
+            if (error || !session) {
+                window.location.href = 'login.html';
+                return;
+            }
+            currentUser = session.user;
+
+            // 2. Muat Profil Guru & Sekolah
+            const [resGuru, resSekolah] = await Promise.all([
+                sb.from('guru').select('*').eq('id', currentUser.id).single(),
+                sb.from('sekolah').select('*').limit(1).single()
+            ]);
+
+            if (!resGuru.data) {
+                alert('Profil guru tidak ditemukan.');
+                window.location.href = 'login.html';
+                return;
+            }
+            profilGuru = resGuru.data;
+            document.getElementById('meta-mapel').value = profilGuru.mapel || '';
+
+            profilSekolah = resSekolah.data || {
+                nama: 'SMP Negeri 1 Indonesia',
+                npsn: '-',
+                kepsek: '-',
+                nip_kepsek: '-',
+                tahun_ajaran: '2025/2026',
+                semester: 'Ganjil'
+            };
+
+            document.getElementById('header-sekolah').innerText = profilSekolah.nama;
+            document.getElementById('header-info').innerText = `${profilGuru.nama} | T.A. ${profilSekolah.tahun_ajaran} (${profilSekolah.semester})`;
+
+            // 3. Muat Arsip Paket Soal Guru
+            await muatArsipPaket();
+        });
+
+        async function muatArsipPaket() {
+            const { data } = await sb
+                .from('paket_soal')
+                .select('*')
+                .eq('guru_id', profilGuru.id)
+                .eq('tahun_ajaran', profilSekolah.tahun_ajaran)
+                .eq('semester', profilSekolah.semester)
+                .order('created_at', { ascending: false });
+
+            arsipPaket = data || [];
+            const sel = document.getElementById('select-arsip-paket');
+            sel.innerHTML = `<option value="">-- Paket Baru (Belum Tersimpan) --</option>`;
+
+            arsipPaket.forEach(p => {
+                const jml = Array.isArray(p.daftar_soal) ? p.daftar_soal.length : 0;
+                sel.innerHTML += `<option value="${p.id}">${p.jenis_asesmen} - ${p.tingkat} (${jml} Soal)</option>`;
+            });
+
+            if (activePaketId) {
+                sel.value = activePaketId;
+            }
+        }
+
+        function pilihArsipPaket(paketId) {
+            if (!paketId) {
+                buatPaketBaru();
+                return;
+            }
+            const paket = arsipPaket.find(p => p.id === paketId);
+            if (!paket) return;
+
+            activePaketId = paket.id;
+            document.getElementById('meta-jenis').value = paket.jenis_asesmen;
+            document.getElementById('meta-tingkat').value = paket.tingkat;
+            document.getElementById('meta-tanggal').value = paket.tanggal_ujian || new Date().toLocaleDateString('en-CA');
+            document.getElementById('meta-waktu').value = paket.alokasi_waktu || '90 Menit';
+            document.getElementById('meta-mapel').value = paket.mapel || profilGuru.mapel || '';
+
+            daftarSoal = Array.isArray(paket.daftar_soal) ? JSON.parse(JSON.stringify(paket.daftar_soal)) : [];
+            document.getElementById('btn-hapus-paket').classList.remove('hidden');
+            resetFormButir();
+            renderDaftarSoal();
+            renderSemuaDokumen();
+        }
+
+        function buatPaketBaru() {
+            activePaketId = null;
+            document.getElementById('select-arsip-paket').value = '';
+            document.getElementById('meta-jenis').value = 'Sumatif Lingkup Materi (Harian)';
+            document.getElementById('meta-tingkat').value = 'Kelas 7';
+            document.getElementById('meta-tanggal').value = new Date().toLocaleDateString('en-CA');
+            document.getElementById('meta-waktu').value = '90 Menit';
+            document.getElementById('meta-mapel').value = profilGuru.mapel || '';
+            daftarSoal = [];
+            document.getElementById('btn-hapus-paket').classList.add('hidden');
+            resetFormButir();
+            renderDaftarSoal();
+            renderSemuaDokumen();
+        }
+
+        async function simpanPaketKeSupabase() {
+            if (daftarSoal.length === 0) {
+                alert('Tambahkan minimal 1 butir soal sebelum menyimpan paket ke database.');
+                return;
+            }
+
+            const btn = document.getElementById('btn-simpan-paket');
+            btn.disabled = true;
+            btn.innerHTML = `<i class="fas fa-spinner fa-spin mr-1"></i> Menyimpan...`;
+
+            const payload = {
+                guru_id: profilGuru.id,
+                tahun_ajaran: profilSekolah.tahun_ajaran,
+                semester: profilSekolah.semester,
+                jenis_asesmen: document.getElementById('meta-jenis').value,
+                tingkat: document.getElementById('meta-tingkat').value,
+                mapel: document.getElementById('meta-mapel').value.trim(),
+                tanggal_ujian: document.getElementById('meta-tanggal').value,
+                alokasi_waktu: document.getElementById('meta-waktu').value.trim(),
+                daftar_soal: daftarSoal,
+                updated_at: new Date().toISOString()
+            };
+
+            let res;
+            if (activePaketId) {
+                res = await sb.from('paket_soal').update(payload).eq('id', activePaketId).select().single();
+            } else {
+                res = await sb.from('paket_soal').insert([payload]).select().single();
+            }
+
+            btn.disabled = false;
+            btn.innerHTML = `<i class="fas fa-cloud-upload-alt mr-1"></i> Simpan Paket ke Database`;
+
+            if (res.error) {
+                alert('Gagal menyimpan paket soal: ' + res.error.message);
+            } else {
+                activePaketId = res.data.id;
+                document.getElementById('btn-hapus-paket').classList.remove('hidden');
+                await muatArsipPaket();
+                alert('Paket soal, kisi-kisi, dan kunci jawaban berhasil tersimpan di Supabase!');
+            }
+        }
+
+        async function hapusPaketAktif() {
+            if (!activePaketId || !confirm('Hapus permanen paket soal ini dari database?')) return;
+            const { error } = await sb.from('paket_soal').delete().eq('id', activePaketId);
+            if (error) {
+                alert('Gagal menghapus paket: ' + error.message);
+            } else {
+                buatPaketBaru();
+                await muatArsipPaket();
+                alert('Paket soal berhasil dihapus.');
+            }
+        }
+
+        // =========================================================================
+        // MANAJEMEN BUTIR SOAL (PG & URAIAN)
+        // =========================================================================
+        function toggleOpsiPG() {
+            const tipe = document.getElementById('soal-tipe').value;
+            const boxPG = document.getElementById('box-opsi-pg');
+            const boxUraian = document.getElementById('box-kunci-uraian');
+
+            if (tipe === 'PG') {
+                boxPG.classList.remove('hidden');
+                boxUraian.classList.add('hidden');
+                document.getElementById('soal-skor').value = 2;
+            } else {
+                boxPG.classList.add('hidden');
+                boxUraian.classList.remove('hidden');
+                document.getElementById('soal-skor').value = 10;
+            }
+        }
+
+        function simpanButirSoal(e) {
+            e.preventDefault();
+            const tipe = document.getElementById('soal-tipe').value;
+            const editIdx = parseInt(document.getElementById('edit-index-soal').value, 10);
+
+            if (tipe === 'PG') {
+                const a = document.getElementById('soal-opsi-a').value.trim();
+                const b = document.getElementById('soal-opsi-b').value.trim();
+                const c = document.getElementById('soal-opsi-c').value.trim();
+                const d = document.getElementById('soal-opsi-d').value.trim();
+                if (!a || !b || !c || !d) {
+                    alert('Lengkapi keempat pilihan jawaban (A, B, C, dan D) untuk soal Pilihan Ganda.');
+                    return;
+                }
+            }
+
+            const item = {
+                tipe: tipe,
+                level: document.getElementById('soal-level').value,
+                skor: parseInt(document.getElementById('soal-skor').value, 10) || 1,
+                tp_materi: document.getElementById('soal-tp').value.trim(),
+                indikator: document.getElementById('soal-indikator').value.trim(),
+                pertanyaan: document.getElementById('soal-pertanyaan').value.trim(),
+                opsi_a: tipe === 'PG' ? document.getElementById('soal-opsi-a').value.trim() : '',
+                opsi_b: tipe === 'PG' ? document.getElementById('soal-opsi-b').value.trim() : '',
+                opsi_c: tipe === 'PG' ? document.getElementById('soal-opsi-c').value.trim() : '',
+                opsi_d: tipe === 'PG' ? document.getElementById('soal-opsi-d').value.trim() : '',
+                kunci: tipe === 'PG'
+                    ? document.getElementById('soal-kunci-pg').value
+                    : (document.getElementById('soal-kunci-uraian').value.trim() || 'Kebijaksanaan guru sesuai rubrik.')
+            };
+
+            if (editIdx >= 0 && editIdx < daftarSoal.length) {
+                daftarSoal[editIdx] = item;
+            } else {
+                daftarSoal.push(item);
+            }
+
+            resetFormButir();
+            renderDaftarSoal();
+            renderSemuaDokumen();
+        }
+
+        function editButirSoal(idx) {
+            const s = daftarSoal[idx];
+            if (!s) return;
+
+            document.getElementById('edit-index-soal').value = idx;
+            document.getElementById('soal-tipe').value = s.tipe;
+            toggleOpsiPG();
+
+            document.getElementById('soal-level').value = s.level;
+            document.getElementById('soal-skor').value = s.skor;
+            document.getElementById('soal-tp').value = s.tp_materi;
+            document.getElementById('soal-indikator').value = s.indikator;
+            document.getElementById('soal-pertanyaan').value = s.pertanyaan;
+
+            if (s.tipe === 'PG') {
+                document.getElementById('soal-opsi-a').value = s.opsi_a;
+                document.getElementById('soal-opsi-b').value = s.opsi_b;
+                document.getElementById('soal-opsi-c').value = s.opsi_c;
+                document.getElementById('soal-opsi-d').value = s.opsi_d;
+                document.getElementById('soal-kunci-pg').value = s.kunci;
+            } else {
+                document.getElementById('soal-kunci-uraian').value = s.kunci;
+            }
+
+            document.getElementById('judul-form-soal').innerHTML = `<i class="fas fa-edit text-amber-600 mr-1"></i> Edit Butir Soal No. ${idx + 1}`;
+            document.getElementById('btn-tambah-butir').innerHTML = `<i class="fas fa-check mr-1"></i> Simpan Perubahan Butir`;
+            document.getElementById('btn-batal-edit-soal').classList.remove('hidden');
+            window.scrollTo({ top: 150, behavior: 'smooth' });
+        }
+
+        function resetFormButir() {
+            document.getElementById('edit-index-soal').value = '-1';
+            document.getElementById('soal-pertanyaan').value = '';
+            document.getElementById('soal-indikator').value = '';
+            document.getElementById('soal-opsi-a').value = '';
+            document.getElementById('soal-opsi-b').value = '';
+            document.getElementById('soal-opsi-c').value = '';
+            document.getElementById('soal-opsi-d').value = '';
+            document.getElementById('soal-kunci-uraian').value = '';
+
+            document.getElementById('judul-form-soal').innerHTML = `<i class="fas fa-plus-circle text-indigo-600 mr-1"></i> Tambah Butir Soal Baru`;
+            document.getElementById('btn-tambah-butir').innerHTML = `<i class="fas fa-plus mr-1"></i> Masukkan ke Daftar Soal`;
+            document.getElementById('btn-batal-edit-soal').classList.add('hidden');
+        }
+
+        function hapusButirSoal(idx) {
+            if (!confirm(`Hapus butir soal nomor ${idx + 1}?`)) return;
+            daftarSoal.splice(idx, 1);
+            renderDaftarSoal();
+            renderSemuaDokumen();
+        }
+
+        function muatContohSoal() {
+            const mapel = document.getElementById('meta-mapel').value.trim() || profilGuru.mapel || 'Pendidikan Pancasila';
+            daftarSoal = [
+                {
+                    tipe: 'PG',
+                    level: 'L1 (LotS - Pengetahuan/Pemahaman)',
+                    skor: 2,
+                    tp_materi: `TP 1.1 Sejarah & Perumusan Dasar Negara (${mapel})`,
+                    indikator: 'Peserta didik dapat mengidentifikasi tanggal pembentukan Badan Penyelidik Usaha-usaha Persiapan Kemerdekaan Indonesia (BPUPKI).',
+                    pertanyaan: 'Badan Penyelidik Usaha-usaha Persiapan Kemerdekaan Indonesia (BPUPKI) secara resmi diumumkan pembentukannya oleh pemerintah Jepang pada tanggal ....',
+                    opsi_a: '1 Maret 1945',
+                    opsi_b: '29 April 1945',
+                    opsi_c: '1 Juni 1945',
+                    opsi_d: '7 Agustus 1945',
+                    kunci: 'A'
+                },
+                {
+                    tipe: 'PG',
+                    level: 'L2 (MotS - Penerapan)',
+                    skor: 2,
+                    tp_materi: 'TP 1.2 Penerapan Nilai Pancasila dalam Kehidupan',
+                    indikator: 'Disajikan ilustrasi musyawarah kelas, peserta didik dapat menentukan sila Pancasila yang tercermin dalam perilaku tersebut.',
+                    pertanyaan: 'Saat menentukan tujuan karya wisata kelas, ketua kelas memimpin diskusi dan menerima keputusan terbanyak meskipun berbeda dengan usulannya sendiri. Sikap ketua kelas mencerminkan pengamalan sila ke-....',
+                    opsi_a: 'Kedua',
+                    opsi_b: 'Ketiga',
+                    opsi_c: 'Keempat',
+                    opsi_d: 'Kelima',
+                    kunci: 'C'
+                },
+                {
+                    tipe: 'URAIAN',
+                    level: 'L3 (HotS - Penalaran/Analisis)',
+                    skor: 6,
+                    tp_materi: 'TP 1.3 Semangat Komitmen Pendiri Negara',
+                    indikator: 'Peserta didik dapat menganalisis dua bentuk teladan komitmen kebangsaan para perumus Pancasila yang relevan diterapkan di lingkungan sekolah.',
+                    pertanyaan: 'Jelaskan 2 (dua) contoh sikap komitmen kebangsaan para perumus dasar negara yang dapat kamu terapkan dalam pergaulan sehari-hari di lingkungan SMP!',
+                    opsi_a: '', opsi_b: '', opsi_c: '', opsi_d: '',
+                    kunci: '1) Mengutamakan kepentingan bersama di atas kepentingan pribadi/kelompok (skor 3). 2) Menghargai perbedaan pendapat saat diskusi kelompok dan menerima hasil musyawarah dengan lapang dada (skor 3).'
+                }
+            ];
+            renderDaftarSoal();
+            renderSemuaDokumen();
+        }
+
+        function renderDaftarSoal() {
+            const tbody = document.getElementById('tbody-daftar-soal');
+            document.getElementById('badge-jumlah-soal').innerText = daftarSoal.length;
+
+            const totalSkor = daftarSoal.reduce((acc, s) => acc + (Number(s.skor) || 0), 0);
+            document.getElementById('info-total-skor').innerText = `Total Skor Maksimal: ${totalSkor}`;
+
+            if (daftarSoal.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="6" class="text-center p-6 text-slate-400">Belum ada butir soal. Tambahkan melalui form di atas atau klik "Isi Contoh Soal".</td></tr>`;
+                return;
+            }
+
+            tbody.innerHTML = '';
+            daftarSoal.forEach((s, idx) => {
+                const badgeTipe = s.tipe === 'PG'
+                    ? `<span class="bg-indigo-100 text-indigo-700 font-bold px-2 py-0.5 rounded text-[10px]">Pilihan Ganda</span>`
+                    : `<span class="bg-purple-100 text-purple-700 font-bold px-2 py-0.5 rounded text-[10px]">Uraian</span>`;
+
+                const ringkasKunci = s.tipe === 'PG' ? `Kunci: <b>${esc(s.kunci)}</b>` : `Rubrik Uraian`;
+
+                tbody.innerHTML += `
+                    <tr class="hover:bg-slate-50 align-top">
+                        <td class="p-2.5 text-center font-bold">${idx + 1}</td>
+                        <td class="p-2.5">${badgeTipe}</td>
+                        <td class="p-2.5 text-[11px] font-semibold text-slate-600">${esc(s.level.split(' ')[0])}</td>
+                        <td class="p-2.5">
+                            <div class="text-[11px] text-indigo-700 font-semibold">${esc(s.tp_materi)}</div>
+                            <div class="text-slate-800 mt-0.5">${esc(s.pertanyaan)}</div>
+                        </td>
+                        <td class="p-2.5 text-center text-[11px]">
+                            <div>${ringkasKunci}</div>
+                            <div class="text-slate-500">Skor: ${s.skor}</div>
+                        </td>
+                        <td class="p-2.5 text-center space-x-1">
+                            <button onclick="editButirSoal(${idx})" title="Edit" class="bg-amber-500 hover:bg-amber-600 text-white px-2 py-1 rounded text-[10px]">
+                                <i class="fas fa-edit"></i>
+                            </button>
+                            <button onclick="hapusButirSoal(${idx})" title="Hapus" class="bg-red-500 hover:bg-red-600 text-white px-2 py-1 rounded text-[10px]">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            });
+        }
+
+        // =========================================================================
+        // GENERATOR 3 DOKUMEN RESMI (KISI-KISI, NASKAH SOAL, KUNCI JAWABAN)
+        // =========================================================================
+        function getKopSuratHTML() {
+            return profilSekolah.img_kop
+                ? `<div class="text-center mb-3"><img src="${profilSekolah.img_kop}" class="max-h-24 mx-auto object-contain"></div>`
+                : `<div class="text-center border-b-2 border-slate-800 pb-2 mb-3">
+                    <h2 class="text-base font-bold uppercase tracking-wide">${esc(profilSekolah.nama)}</h2>
+                    <p class="text-[10px] text-slate-600">NPSN: ${esc(profilSekolah.npsn || '-')} | Dokumen Asesmen Kurikulum Merdeka</p>
+                   </div>`;
+        }
+
+        function getBlokTTDHTML() {
+            const ttdKepsek = profilSekolah.img_ttd ? `<img src="${profilSekolah.img_ttd}" class="h-14 mx-auto object-contain my-1">` : `<div class="h-12"></div>`;
+            return `
+                <div class="grid grid-cols-2 text-center text-xs mt-8 pt-4">
+                    <div>
+                        <p>Mengetahui,</p>
+                        <p class="font-bold">Kepala ${esc(profilSekolah.nama)}</p>
+                        ${ttdKepsek}
+                        <p class="font-bold underline">${esc(profilSekolah.kepsek || '-')}</p>
+                        <p>NIP. ${esc(profilSekolah.nip_kepsek || '-')}</p>
+                    </div>
+                    <div>
+                        <p>Guru Mata Pelajaran,</p>
+                        <div class="h-14"></div>
+                        <p class="font-bold underline">${esc(profilGuru.nama)}</p>
+                        <p>NIP. ${esc(profilGuru.username)}</p>
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderSemuaDokumen() {
+            const jenis = document.getElementById('meta-jenis').value;
+            const tingkat = document.getElementById('meta-tingkat').value;
+            const mapel = document.getElementById('meta-mapel').value.trim() || '-';
+            const tanggal = document.getElementById('meta-tanggal').value || '-';
+            const waktu = document.getElementById('meta-waktu').value.trim() || '90 Menit';
+
+            const soalPG = daftarSoal.filter(s => s.tipe === 'PG');
+            const soalUraian = daftarSoal.filter(s => s.tipe === 'URAIAN');
+            const totalSkor = daftarSoal.reduce((acc, s) => acc + (Number(s.skor) || 0), 0);
+
+            // 1. RENDER KISI-KISI SOAL
+            let rowsKisi = '';
+            let noUrut = 1;
+            [...soalPG, ...soalUraian].forEach((s, i) => {
+                const bentuk = s.tipe === 'PG' ? 'Pilihan Ganda' : 'Uraian';
+                rowsKisi += `
+                    <tr class="align-top">
+                        <td class="p-2 border border-slate-400 text-center">${i + 1}</td>
+                        <td class="p-2 border border-slate-400">${esc(s.tp_materi)}</td>
+                        <td class="p-2 border border-slate-400">${esc(s.indikator)}</td>
+                        <td class="p-2 border border-slate-400 text-center font-semibold">${esc(s.level.split(' ')[0])}</td>
+                        <td class="p-2 border border-slate-400 text-center">${bentuk}</td>
+                        <td class="p-2 border border-slate-400 text-center font-bold">${noUrut++}</td>
+                        <td class="p-2 border border-slate-400 text-center">${s.skor}</td>
+                    </tr>
+                `;
+            });
+
+            document.getElementById('area-cetak-kisikisi').innerHTML = `
+                ${getKopSuratHTML()}
+                <div class="text-center font-bold mb-3">
+                    <h3 class="text-sm uppercase">KISI-KISI PENULISAN SOAL ${esc(jenis)}</h3>
+                    <p class="text-xs font-normal">Tahun Pelajaran ${esc(profilSekolah.tahun_ajaran)} | Semester ${esc(profilSekolah.semester)}</p>
+                </div>
+                <table class="w-full text-xs mb-3">
+                    <tr>
+                        <td class="w-36 font-semibold py-0.5">Satuan Pendidikan</td><td class="w-3">:</td><td>${esc(profilSekolah.nama)}</td>
+                        <td class="w-32 font-semibold py-0.5">Kelas / Fase</td><td class="w-3">:</td><td>${esc(tingkat)} / Fase D</td>
+                    </tr>
+                    <tr>
+                        <td class="font-semibold py-0.5">Mata Pelajaran</td><td>:</td><td>${esc(mapel)}</td>
+                        <td class="font-semibold py-0.5">Jumlah Soal</td><td>:</td><td>${soalPG.length} PG, ${soalUraian.length} Uraian</td>
+                    </tr>
+                </table>
+                <table class="w-full text-left border-collapse border border-slate-400 text-xs">
+                    <thead>
+                        <tr class="bg-slate-100">
+                            <th class="p-2 border border-slate-400 text-center w-10">No</th>
+                            <th class="p-2 border border-slate-400 w-1/4">Tujuan Pembelajaran / Materi</th>
+                            <th class="p-2 border border-slate-400">Indikator Soal</th>
+                            <th class="p-2 border border-slate-400 text-center w-16">Level</th>
+                            <th class="p-2 border border-slate-400 text-center w-24">Bentuk Soal</th>
+                            <th class="p-2 border border-slate-400 text-center w-16">No. Soal</th>
+                            <th class="p-2 border border-slate-400 text-center w-14">Skor</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${rowsKisi || `<tr><td colspan="7" class="p-4 border border-slate-400 text-center text-slate-400">Belum ada butir soal.</td></tr>`}
+                    </tbody>
+                </table>
+                ${getBlokTTDHTML()}
+            `;
+
+            // 2. RENDER NASKAH SOAL UJIAN
+            let htmlPG = '';
+            soalPG.forEach((s, idx) => {
+                htmlPG += `
+                    <div class="mb-3 break-inside-avoid">
+                        <div class="flex gap-2">
+                            <span class="font-bold w-5">${idx + 1}.</span>
+                            <div class="flex-1">
+                                <p class="mb-1.5 whitespace-pre-line">${esc(s.pertanyaan)}</p>
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-1 pl-1">
+                                    <div><b>A.</b> ${esc(s.opsi_a)}</div>
+                                    <div><b>C.</b> ${esc(s.opsi_c)}</div>
+                                    <div><b>B.</b> ${esc(s.opsi_b)}</div>
+                                    <div><b>D.</b> ${esc(s.opsi_d)}</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+
+            let htmlUraian = '';
+            soalUraian.forEach((s, idx) => {
+                htmlUraian += `
+                    <div class="mb-3 break-inside-avoid">
+                        <div class="flex gap-2">
+                            <span class="font-bold w-5">${idx + 1}.</span>
+                            <div class="flex-1 whitespace-pre-line">${esc(s.pertanyaan)}</div>
+                        </div>
+                    </div>
+                `;
+            });
+
+            document.getElementById('area-cetak-naskah').innerHTML = `
+                ${getKopSuratHTML()}
+                <div class="text-center font-bold border-b border-slate-800 pb-2 mb-3">
+                    <h3 class="text-sm uppercase">${esc(jenis)}</h3>
+                    <p class="text-xs font-semibold">TAHUN PELAJARAN ${esc(profilSekolah.tahun_ajaran)} (SEMESTER ${esc(profilSekolah.semester).toUpperCase()})</p>
+                </div>
+
+                <!-- Kotak Identitas Ujian & Peserta Didik -->
+                <table class="w-full text-xs border-collapse border border-slate-800 mb-3">
+                    <tr>
+                        <td class="p-1.5 border border-slate-800 font-semibold w-32">Mata Pelajaran</td>
+                        <td class="p-1.5 border border-slate-800 w-1/3">: ${esc(mapel)}</td>
+                        <td class="p-1.5 border border-slate-800 font-semibold w-32">Nama Peserta</td>
+                        <td class="p-1.5 border border-slate-800">: ................................................</td>
+                    </tr>
+                    <tr>
+                        <td class="p-1.5 border border-slate-800 font-semibold">Kelas / Fase</td>
+                        <td class="p-1.5 border border-slate-800">: ${esc(tingkat)} / Fase D</td>
+                        <td class="p-1.5 border border-slate-800 font-semibold">Kelas / No. Absen</td>
+                        <td class="p-1.5 border border-slate-800">: .................... / ......................</td>
+                    </tr>
+                    <tr>
+                        <td class="p-1.5 border border-slate-800 font-semibold">Hari / Tanggal</td>
+                        <td class="p-1.5 border border-slate-800">: ${esc(tanggal)}</td>
+                        <td class="p-1.5 border border-slate-800 font-semibold">Alokasi Waktu</td>
+                        <td class="p-1.5 border border-slate-800">: ${esc(waktu)}</td>
+                    </tr>
+                </table>
+
+                <div class="bg-slate-50 border border-slate-300 p-2 rounded text-[11px] mb-4">
+                    <b>Petunjuk Umum:</b> 1) Berdoalah sebelum mengerjakan soal. 2) Tuliskan identitas diri pada kolom yang tersedia. 3) Kerjakan soal yang dianggap paling mudah terlebih dahulu.
+                </div>
+
+                ${soalPG.length > 0 ? `
+                    <div class="mb-4">
+                        <h4 class="font-bold uppercase text-xs mb-2">I. Pilihlah satu jawaban yang paling tepat (A, B, C, atau D)!</h4>
+                        ${htmlPG}
+                    </div>
+                ` : ''}
+
+                ${soalUraian.length > 0 ? `
+                    <div class="mt-4">
+                        <h4 class="font-bold uppercase text-xs mb-2">II. Jawablah pertanyaan-pertanyaan berikut dengan jelas dan tepat!</h4>
+                        ${htmlUraian}
+                    </div>
+                ` : ''}
+
+                ${daftarSoal.length === 0 ? `<p class="text-center text-slate-400 py-6">Belum ada butir soal dalam paket ini.</p>` : ''}
+            `;
+
+            // 3. RENDER KUNCI JAWABAN & PEDOMAN PENSKORAN
+            let rowsKunciPG = '';
+            soalPG.forEach((s, idx) => {
+                rowsKunciPG += `
+                    <tr>
+                        <td class="p-1.5 border border-slate-400 text-center font-bold">${idx + 1}</td>
+                        <td class="p-1.5 border border-slate-400 text-center font-bold text-emerald-700">${esc(s.kunci)}</td>
+                        <td class="p-1.5 border border-slate-400 text-center">${s.skor}</td>
+                    </tr>
+                `;
+            });
+
+            let rowsKunciUraian = '';
+            soalUraian.forEach((s, idx) => {
+                rowsKunciUraian += `
+                    <tr class="align-top">
+                        <td class="p-2 border border-slate-400 text-center font-bold">${idx + 1}</td>
+                        <td class="p-2 border border-slate-400 whitespace-pre-line">${esc(s.kunci)}</td>
+                        <td class="p-2 border border-slate-400 text-center font-bold">${s.skor}</td>
+                    </tr>
+                `;
+            });
+
+            document.getElementById('area-cetak-kunci').innerHTML = `
+                ${getKopSuratHTML()}
+                <div class="text-center font-bold mb-3">
+                    <h3 class="text-sm uppercase">KUNCI JAWABAN & PEDOMAN PENSKORAN</h3>
+                    <p class="text-xs font-normal">${esc(jenis)} | Mapel: <b>${esc(mapel)}</b> | ${esc(tingkat)}</p>
+                </div>
+
+                ${soalPG.length > 0 ? `
+                    <div class="mb-4">
+                        <h4 class="font-bold text-xs mb-1.5">A. Kunci Jawaban Pilihan Ganda</h4>
+                        <table class="w-full md:w-1/2 border-collapse border border-slate-400 text-xs">
+                            <thead>
+                                <tr class="bg-slate-100">
+                                    <th class="p-1.5 border border-slate-400 text-center w-20">No. Soal</th>
+                                    <th class="p-1.5 border border-slate-400 text-center w-24">Kunci</th>
+                                    <th class="p-1.5 border border-slate-400 text-center w-20">Skor</th>
+                                </tr>
+                            </thead>
+                            <tbody>${rowsKunciPG}</tbody>
+                        </table>
+                    </div>
+                ` : ''}
+
+                ${soalUraian.length > 0 ? `
+                    <div class="mb-4">
+                        <h4 class="font-bold text-xs mb-1.5">B. Pedoman Penskoran Soal Uraian</h4>
+                        <table class="w-full border-collapse border border-slate-400 text-xs">
+                            <thead>
+                                <tr class="bg-slate-100">
+                                    <th class="p-2 border border-slate-400 text-center w-16">No.</th>
+                                    <th class="p-2 border border-slate-400">Uraian Jawaban & Kriteria Penilaian</th>
+                                    <th class="p-2 border border-slate-400 text-center w-24">Skor Maks</th>
+                                </tr>
+                            </thead>
+                            <tbody>${rowsKunciUraian}</tbody>
+                        </table>
+                    </div>
+                ` : ''}
+
+                <div class="bg-slate-50 border border-slate-300 p-3 rounded text-xs">
+                    <p class="font-bold mb-1">Rumus Perhitungan Nilai Akhir:</p>
+                    <p class="font-mono">Nilai Akhir = (Total Skor Perolehan Siswa / ${totalSkor || 'Total Skor Maksimal'}) × 100</p>
+                </div>
+
+                ${getBlokTTDHTML()}
+            `;
+        }
+
+        function switchSubTab(tab) {
+            const tabs = ['editor', 'kisikisi', 'naskah', 'kunci'];
+            tabs.forEach(t => {
+                const btn = document.getElementById(`btn-tab-${t}`);
+                const panel = document.getElementById(`panel-${t}`);
+                if (t === tab) {
+                    btn.className = 'px-4 py-2 text-xs font-bold border-b-2 border-indigo-600 text-indigo-700 bg-white rounded-t-lg';
+                    panel.classList.remove('hidden');
+                } else {
+                    btn.className = 'px-4 py-2 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-indigo-600';
+                    panel.classList.add('hidden');
+                }
+            });
+            if (tab !== 'editor') {
+                renderSemuaDokumen();
+            }
+        }
+
+        function exportWord(elemId, filename) {
+            const html = "<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'><head><meta charset='utf-8'></head><body>" + document.getElementById(elemId).innerHTML + "</body></html>";
+            const blob = new Blob(['\ufeff', html], { type: 'application/msword' });
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = `${filename}_${new Date().toISOString().slice(0, 10)}.doc`;
+            a.click();
+        }
+
+        function exportExcel(elemId, filename) {
+            const html = document.getElementById(elemId).innerHTML;
+            const blob = new Blob(['\ufeff' + html], { type: 'application/vnd.ms-excel' });
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = `${filename}_${new Date().toISOString().slice(0, 10)}.xls`;
+            a.click();
+        }
+
+        function cetakDokumen(elemId, judul) {
+            const content = document.getElementById(elemId).innerHTML;
+            const win = window.open('', '', 'height=680,width=920');
+            win.document.write(`<html><head><title>${judul}</title><script src="https://cdn.tailwindcss.com"><\/script></head><body class="p-8">`);
+            win.document.write(content);
+            win.document.write('</body></html>');
+            win.document.close();
+            setTimeout(() => win.print(), 500);
+        }
+
+        async function logout() {
+            await sb.auth.signOut();
+            window.location.href = 'login.html';
+        }
+    </script>
+</body>
+</html>
