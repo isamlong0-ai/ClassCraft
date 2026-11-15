@@ -443,11 +443,12 @@
                 </div>
             `;
 
-            // Query data presensi dari Supabase
+            // Query data presensi dari Supabase (hanya catatan milik guru ini)
             let query = sb
                 .from('presensi')
                 .select('siswa_id, tanggal, status')
                 .eq('rombel_id', rombelId)
+                .eq('guru_id', profilGuru.id)
                 .eq('tahun_ajaran', profilSekolah.tahun_ajaran)
                 .eq('semester', profilSekolah.semester);
 

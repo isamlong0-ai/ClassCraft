@@ -102,7 +102,8 @@ create table if not exists public.jurnal_mengajar (
     kehadiran_ringkas text default '',
     catatan_kejadian  text default '-',
     created_at        timestamptz not null default now(),
-    updated_at        timestamptz not null default now()
+    updated_at        timestamptz not null default now(),
+    unique (guru_id, tanggal, rombel_id, jam_ke)
 );
 
 -- -------------------------------------------------------------
@@ -112,7 +113,7 @@ create table if not exists public.presensi (
     id           uuid primary key default gen_random_uuid(),
     rombel_id    uuid not null references public.rombel(id) on delete cascade,
     siswa_id     uuid not null references public.siswa(id) on delete cascade,
-    guru_id      uuid references public.guru(id) on delete set null,
+    guru_id      uuid not null references public.guru(id) on delete restrict,
     mapel        text not null default '',
     tanggal      date not null default current_date,
     tahun_ajaran text not null default '2025/2026',

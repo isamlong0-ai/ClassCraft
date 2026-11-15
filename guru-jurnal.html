@@ -456,7 +456,10 @@
             if (editId) {
                 res = await sb.from('jurnal_mengajar').update(payload).eq('id', editId);
             } else {
-                res = await sb.from('jurnal_mengajar').insert([payload]);
+                // Upsert agar menyimpan ulang slot yang sama (guru + tanggal +
+                // rombel + jam ke) memperbarui baris, bukan membuat duplikat.
+                res = await sb.from('jurnal_mengajar')
+                    .upsert(payload, { onConflict: 'guru_id,tanggal,rombel_id,jam_ke' });
             }
 
             btn.disabled = false;

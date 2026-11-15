@@ -28,6 +28,7 @@ dan database berada pada kondisi yang selaras (tidak ada migrasi tertunda).
 6. `20261114095607` — cabut `is_admin()` dari `anon`
 7. `20261115024215` — tabel `jurnal_mengajar`, `presensi`, `paket_soal` (+ RLS, index, trigger `updated_at`)
 8. `20261115024237` — hapus policy warisan pada `jurnal_mengajar`
+9. `20261115024706` — unique `jurnal_mengajar` (anti-duplikat) + `presensi.guru_id` NOT NULL / ON DELETE RESTRICT
 
 ## Menghubungkan ke GitHub (dashboard)
 
