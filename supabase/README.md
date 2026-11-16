@@ -29,6 +29,7 @@ dan database berada pada kondisi yang selaras (tidak ada migrasi tertunda).
 7. `20261115024215` — tabel `jurnal_mengajar`, `presensi`, `paket_soal` (+ RLS, index, trigger `updated_at`)
 8. `20261115024237` — hapus policy warisan pada `jurnal_mengajar`
 9. `20261115024706` — unique `jurnal_mengajar` (anti-duplikat) + `presensi.guru_id` NOT NULL / ON DELETE RESTRICT
+10. `20261116113815` — Tahap 1 tahun ajaran: `rombel` (rapikan `tingkat`, `tahun_ajaran` NOT NULL, unique `(nama, tahun_ajaran)`) + `siswa` (`status`/`tanggal_keluar`/`keterangan`, `rombel_id` nullable, `nisn` unik global)
 
 ## Menghubungkan ke GitHub (dashboard)
 

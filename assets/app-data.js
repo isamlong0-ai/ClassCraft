@@ -272,7 +272,10 @@
         return {
             id: s.id || uid(),
             nisn: s.nisn, nipd: s.nipd || '-', nama: s.nama,
-            jk: (s.jk || 'L').toUpperCase() === 'P' ? 'P' : 'L'
+            jk: (s.jk || 'L').toUpperCase() === 'P' ? 'P' : 'L',
+            status: s.status || 'aktif',
+            tanggal_keluar: s.tanggal_keluar || null,
+            keterangan: s.keterangan || ''
         };
     }
 
@@ -280,7 +283,8 @@
         if (sb) {
             try {
                 var res = await sb.from('rombel')
-                    .select('id,tingkat,nama,wali_id,siswa(id,nisn,nipd,nama,jk)')
+                    .select('id,tingkat,nama,wali_id,tahun_ajaran,siswa(id,nisn,nipd,nama,jk,status,tanggal_keluar,keterangan)')
+                    .order('tahun_ajaran')
                     .order('nama');
                 if (res.error) throw res.error;
                 var guruRes = await sb.from('guru').select('id,nama');
@@ -289,6 +293,7 @@
                 var mapped = (res.data || []).map(function (r) {
                     return {
                         id: r.id, tingkat: r.tingkat, nama: r.nama,
+                        tahun_ajaran: r.tahun_ajaran || '',
                         wali: r.wali_id ? (map[r.wali_id] || '-') : '-',
                         siswa: (r.siswa || []).map(function (s) { return normalizeSiswa(s); })
                     };
@@ -311,12 +316,20 @@
                 var g = await sb.from('guru').select('id').eq('nama', data.wali).maybeSingle();
                 if (!g.error && g.data) waliId = g.data.id;
             }
-            var res = await sb.from('rombel').insert({ tingkat: data.tingkat, nama: data.nama, wali_id: waliId }).select().single();
+            var ta = data.tahun_ajaran;
+            if (!ta) {
+                var sek = await getSekolah();
+                ta = (sek && sek.tahun_ajaran) || '2025/2026';
+            }
+            var res = await sb.from('rombel')
+                .insert({ tingkat: data.tingkat, nama: data.nama, wali_id: waliId, tahun_ajaran: ta })
+                .select().single();
             if (res.error) throw res.error;
-            return { id: res.data.id, tingkat: res.data.tingkat, nama: res.data.nama, wali: data.wali || '-', siswa: [] };
+            return { id: res.data.id, tingkat: res.data.tingkat, nama: res.data.nama, tahun_ajaran: res.data.tahun_ajaran, wali: data.wali || '-', siswa: [] };
         }
         var rombel = await getRombel();
-        rombel.push({ id: data.nama, tingkat: data.tingkat, nama: data.nama, wali: data.wali || '-', siswa: [] });
+        var sekOff = await getSekolah();
+        rombel.push({ id: data.nama, tingkat: data.tingkat, nama: data.nama, tahun_ajaran: data.tahun_ajaran || (sekOff && sekOff.tahun_ajaran) || '2025/2026', wali: data.wali || '-', siswa: [] });
         lsSet(KEY.rombel, rombel);
         return rombel[rombel.length - 1];
     }
@@ -359,8 +372,35 @@
         return rows.length;
     }
 
+    // Ubah status siswa (aktif/lulus/pindah/berhenti) tanpa menghapus data.
+    async function setStatusSiswa(siswaId, status, opts) {
+        opts = opts || {};
+        var patch = {
+            status: status,
+            tanggal_keluar: (status === 'aktif') ? null : (opts.tanggalKeluar || new Date().toISOString().slice(0, 10)),
+            keterangan: opts.keterangan || ''
+        };
+        if (sb) {
+            var res = await sb.from('siswa').update(patch).eq('id', siswaId);
+            if (res.error) throw res.error;
+            return patch;
+        }
+        var rombel = lsGet(KEY.rombel, null) || DEFAULT_ROMBEL.slice();
+        rombel.forEach(function (r) {
+            (r.siswa || []).forEach(function (s) { if (s.id === siswaId) Object.assign(s, patch); });
+        });
+        lsSet(KEY.rombel, rombel);
+        return patch;
+    }
+
     async function deleteSiswa(siswaId) {
         if (sb) {
+            // Tolak hapus permanen bila siswa punya riwayat presensi agar
+            // data tidak hilang — gunakan status Pindah/Berhenti.
+            var cek = await sb.from('presensi').select('id', { count: 'exact', head: true }).eq('siswa_id', siswaId);
+            if (!cek.error && (cek.count || 0) > 0) {
+                throw new Error('Siswa memiliki riwayat presensi. Tandai sebagai Pindah/Berhenti, jangan hapus permanen.');
+            }
             var res = await sb.from('siswa').delete().eq('id', siswaId);
             if (res.error) throw res.error;
             return;
@@ -437,6 +477,7 @@
         addSiswa: addSiswa,
         importSiswa: importSiswa,
         deleteSiswa: deleteSiswa,
+        setStatusSiswa: setStatusSiswa,
         exportAll: exportAll,
         restoreAll: restoreAll,
         defaults: { users: DEFAULT_USERS, sekolah: DEFAULT_SEKOLAH, rombel: DEFAULT_ROMBEL }

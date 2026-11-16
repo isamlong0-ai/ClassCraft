@@ -51,24 +51,27 @@ create table if not exists public.guru (
 create table if not exists public.rombel (
     id           uuid primary key default gen_random_uuid(),
     tingkat      text not null,
-    nama         text unique not null,
+    nama         text not null,
     wali_id      uuid references public.guru(id) on delete set null,
-    tahun_ajaran text,
-    created_at   timestamptz not null default now()
+    tahun_ajaran text not null,
+    created_at   timestamptz not null default now(),
+    unique (nama, tahun_ajaran)
 );
 
 -- -------------------------------------------------------------
 -- Tabel: siswa
 -- -------------------------------------------------------------
 create table if not exists public.siswa (
-    id         uuid primary key default gen_random_uuid(),
-    rombel_id  uuid not null references public.rombel(id) on delete cascade,
-    nisn       text not null,
-    nipd       text default '-',
-    nama       text not null,
-    jk         text not null default 'L' check (jk in ('L', 'P')),
-    created_at timestamptz not null default now(),
-    unique (rombel_id, nisn)
+    id             uuid primary key default gen_random_uuid(),
+    rombel_id      uuid references public.rombel(id) on delete cascade,
+    nisn           text not null unique,
+    nipd           text default '-',
+    nama           text not null,
+    jk             text not null default 'L' check (jk in ('L', 'P')),
+    status         text not null default 'aktif' check (status in ('aktif', 'lulus', 'pindah', 'berhenti')),
+    tanggal_keluar date,
+    keterangan     text default '',
+    created_at     timestamptz not null default now()
 );
 
 -- -------------------------------------------------------------
@@ -149,6 +152,7 @@ create table if not exists public.paket_soal (
 create index if not exists idx_guru_role         on public.guru(role);
 create index if not exists idx_rombel_wali       on public.rombel(wali_id);
 create index if not exists idx_siswa_rombel      on public.siswa(rombel_id);
+create index if not exists idx_siswa_status      on public.siswa(status);
 create index if not exists idx_modul_ajar_guru   on public.modul_ajar(guru_id);
 create index if not exists idx_modul_ajar_rombel on public.modul_ajar(rombel_id);
 

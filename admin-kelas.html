@@ -50,7 +50,10 @@
             <div class="md:col-span-2 bg-white p-6 rounded-xl shadow-md border space-y-4">
                 <div class="flex justify-between items-center border-b pb-3">
                     <h2 class="text-base font-bold text-indigo-700"><i class="fas fa-user-graduate mr-2"></i>Data Siswa Per Kelas</h2>
-                    <div class="flex gap-2">
+                    <div class="flex flex-wrap items-center gap-2">
+                        <label class="flex items-center gap-1 text-xs text-slate-600 bg-white border rounded px-2 py-1.5 cursor-pointer">
+                            <input type="checkbox" id="filter-aktif" checked onchange="renderSiswa()" class="accent-indigo-600"> Hanya siswa aktif
+                        </label>
                         <select id="select-active-rombel" onchange="renderSiswa()" class="p-1.5 border rounded text-xs font-bold text-indigo-700 bg-indigo-50"></select>
                         <button onclick="exportExcelSiswa()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs px-3 py-1.5 rounded font-medium"><i class="fas fa-file-excel mr-1"></i> Ekspor Excel</button>
                     </div>
@@ -80,7 +83,7 @@
                     <table class="w-full text-left border-collapse text-xs">
                         <thead>
                             <tr class="bg-slate-100 text-slate-700 border-b">
-                                <th class="p-2">No</th><th class="p-2">NISN</th><th class="p-2">NIPD</th><th class="p-2">Nama Siswa</th><th class="p-2 text-center">JK</th><th class="p-2 text-center">Aksi</th>
+                                <th class="p-2">No</th><th class="p-2">NISN</th><th class="p-2">NIPD</th><th class="p-2">Nama Siswa</th><th class="p-2 text-center">JK</th><th class="p-2 text-center">Status</th><th class="p-2 text-center">Aksi</th>
                             </tr>
                         </thead>
                         <tbody id="tabel-siswa" class="divide-y"></tbody>
@@ -143,11 +146,12 @@
             cardContainer.innerHTML = ''; selectActive.innerHTML = '';
 
             dbRombel.forEach(r => {
-                cardContainer.innerHTML += `<div class="p-2 bg-slate-50 border rounded text-xs flex justify-between">
-                    <div><b>${escapeHtml(r.nama)}</b> <span class="text-[10px] text-slate-500">(${escapeHtml(r.tingkat)})</span></div>
-                    <span class="bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded text-[10px] font-bold">${r.siswa.length} Siswa</span>
+                const aktifCount = r.siswa.filter(s => (s.status || 'aktif') === 'aktif').length;
+                cardContainer.innerHTML += `<div class="p-2 bg-slate-50 border rounded text-xs flex justify-between gap-2">
+                    <div><b>${escapeHtml(r.nama)}</b> <span class="text-[10px] text-slate-500">(${escapeHtml(r.tingkat)}${r.tahun_ajaran ? ' · ' + escapeHtml(r.tahun_ajaran) : ''})</span></div>
+                    <span class="bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded text-[10px] font-bold whitespace-nowrap">${aktifCount} Aktif</span>
                 </div>`;
-                selectActive.innerHTML += `<option value="${escapeHtml(r.id)}">Kelas ${escapeHtml(r.nama)}</option>`;
+                selectActive.innerHTML += `<option value="${escapeHtml(r.id)}">Kelas ${escapeHtml(r.nama)}${r.tahun_ajaran ? ' — ' + escapeHtml(r.tahun_ajaran) : ''}</option>`;
             });
 
             if (prevActive && dbRombel.some(r => r.id === prevActive)) {
@@ -176,21 +180,76 @@
             }
         }
 
+        const STATUS_LABEL = { aktif: 'Aktif', lulus: 'Lulus', pindah: 'Pindah', berhenti: 'Berhenti' };
+        const STATUS_CLASS = {
+            aktif: 'bg-emerald-100 text-emerald-700',
+            lulus: 'bg-sky-100 text-sky-700',
+            pindah: 'bg-amber-100 text-amber-700',
+            berhenti: 'bg-rose-100 text-rose-700'
+        };
+
+        function statusBadge(status) {
+            const key = STATUS_LABEL[status] ? status : 'aktif';
+            return `<span class="px-1.5 py-0.5 rounded text-[10px] font-bold ${STATUS_CLASS[key]}">${STATUS_LABEL[key]}</span>`;
+        }
+
         function renderSiswa() {
             const activeId = document.getElementById('select-active-rombel').value;
+            const hanyaAktif = document.getElementById('filter-aktif').checked;
             const tbody = document.getElementById('tabel-siswa'); tbody.innerHTML = '';
             const rombel = dbRombel.find(r => r.id === activeId);
             if (!rombel || rombel.siswa.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="6" class="text-center p-3 text-slate-400">Belum ada siswa</td></tr>`; return;
+                tbody.innerHTML = `<tr><td colspan="7" class="text-center p-3 text-slate-400">Belum ada siswa</td></tr>`; return;
             }
-            const rombelIndex = dbRombel.indexOf(rombel);
-            rombel.siswa.forEach((s, idx) => {
-                tbody.innerHTML += `<tr>
+
+            const daftar = hanyaAktif
+                ? rombel.siswa.filter(s => (s.status || 'aktif') === 'aktif')
+                : rombel.siswa;
+
+            if (daftar.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="7" class="text-center p-3 text-slate-400">Tidak ada siswa aktif. Hilangkan centang "Hanya siswa aktif" untuk melihat arsip.</td></tr>`; return;
+            }
+
+            daftar.forEach((s, idx) => {
+                const status = s.status || 'aktif';
+                const aktif = status === 'aktif';
+                const tombolStatus = aktif
+                    ? `<button onclick="ubahStatus('${escapeHtml(s.id)}','pindah')" class="text-amber-600 hover:text-amber-800 transition" title="Tandai pindah"><i class="fas fa-right-from-bracket"></i></button>
+                       <button onclick="ubahStatus('${escapeHtml(s.id)}','berhenti')" class="text-rose-500 hover:text-rose-700 transition" title="Tandai berhenti"><i class="fas fa-user-slash"></i></button>`
+                    : `<button onclick="ubahStatus('${escapeHtml(s.id)}','aktif')" class="text-emerald-600 hover:text-emerald-800 transition" title="Aktifkan kembali"><i class="fas fa-rotate-left"></i></button>`;
+                tbody.innerHTML += `<tr class="${aktif ? '' : 'opacity-60'}">
                     <td class="p-2">${idx+1}</td><td class="p-2 font-mono">${escapeHtml(s.nisn)}</td><td class="p-2 font-mono">${escapeHtml(s.nipd || '-')}</td>
                     <td class="p-2 font-medium">${escapeHtml(s.nama)}</td><td class="p-2 text-center">${escapeHtml(s.jk)}</td>
-                    <td class="p-2 text-center"><button onclick="hapusSiswa(${rombelIndex},${idx})" class="text-red-500 hover:text-red-700 transition"><i class="fas fa-trash"></i></button></td>
+                    <td class="p-2 text-center">${statusBadge(status)}</td>
+                    <td class="p-2 text-center space-x-2 whitespace-nowrap">
+                        ${tombolStatus}
+                        <button onclick="hapusSiswa('${escapeHtml(s.id)}')" class="text-slate-400 hover:text-red-600 transition" title="Hapus permanen (salah input)"><i class="fas fa-trash"></i></button>
+                    </td>
                 </tr>`;
             });
+        }
+
+        async function ubahStatus(siswaId, status) {
+            let tanggalKeluar = null;
+            let keterangan = '';
+            if (status !== 'aktif') {
+                const tgl = prompt('Tanggal keluar (YYYY-MM-DD), kosongkan untuk hari ini:', new Date().toISOString().slice(0, 10));
+                if (tgl === null) return;
+                tanggalKeluar = tgl.trim() || null;
+                const ket = prompt(status === 'pindah'
+                    ? 'Sekolah tujuan (opsional):'
+                    : 'Keterangan / alasan (opsional):', '');
+                if (ket === null) return;
+                keterangan = ket.trim();
+            }
+            try {
+                await CC.setStatusSiswa(siswaId, status, { tanggalKeluar, keterangan });
+                dbRombel = await CC.getRombel();
+                renderRombel();
+            } catch (err) {
+                console.error(err);
+                alert('Gagal mengubah status siswa: ' + (err.message || err));
+            }
         }
 
         async function tambahSiswa(e) {
@@ -246,14 +305,13 @@
             }
         }
 
-        async function hapusSiswa(rombelIndex, idx) {
-            const rombel = dbRombel[rombelIndex];
-            if (!rombel || !rombel.siswa[idx]) return;
-            if (!confirm('Hapus siswa ini?')) return;
-            const siswa = rombel.siswa[idx];
+        async function hapusSiswa(siswaId) {
+            const siswa = dbRombel.flatMap(r => r.siswa).find(s => s.id === siswaId);
+            if (!siswa) return;
+            if (!confirm(`Hapus permanen siswa "${siswa.nama}"?\n\nGunakan tombol ini HANYA untuk salah input. Untuk siswa pindah/berhenti gunakan tombol status agar riwayat presensi tetap tersimpan.`)) return;
             try {
-                await CC.deleteSiswa(siswa.id);
-                rombel.siswa.splice(idx, 1);
+                await CC.deleteSiswa(siswaId);
+                dbRombel = await CC.getRombel();
                 renderRombel();
             } catch (err) {
                 console.error(err);
@@ -265,8 +323,10 @@
             const activeId = document.getElementById('select-active-rombel').value;
             const rombel = dbRombel.find(r => r.id === activeId);
             if (!rombel) return;
-            let table = `<table border="1"><tr><th colspan="5">DAFTAR SISWA KELAS ${rombel.nama}</th></tr><tr><th>No</th><th>NISN</th><th>NIPD</th><th>Nama</th><th>JK</th></tr>`;
-            rombel.siswa.forEach((s, idx) => { table += `<tr><td>${idx+1}</td><td>'${s.nisn}</td><td>'${s.nipd}</td><td>${s.nama}</td><td>${s.jk}</td></tr>`; }); table += `</table>`; const blob = new Blob(['\ufeff' + table], { type: 'application/vnd.ms-excel' }); const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `Siswa_${rombel.nama}.xls`; a.click();
+            const hanyaAktif = document.getElementById('filter-aktif').checked;
+            const daftar = hanyaAktif ? rombel.siswa.filter(s => (s.status || 'aktif') === 'aktif') : rombel.siswa;
+            let table = `<table border="1"><tr><th colspan="7">DAFTAR SISWA KELAS ${escapeHtml(rombel.nama)}${rombel.tahun_ajaran ? ' — ' + escapeHtml(rombel.tahun_ajaran) : ''}</th></tr><tr><th>No</th><th>NISN</th><th>NIPD</th><th>Nama</th><th>JK</th><th>Status</th><th>Keterangan</th></tr>`;
+            daftar.forEach((s, idx) => { table += `<tr><td>${idx+1}</td><td>'${escapeHtml(s.nisn)}</td><td>${escapeHtml(s.nipd || '-')}</td><td>${escapeHtml(s.nama)}</td><td>${escapeHtml(s.jk)}</td><td>${STATUS_LABEL[s.status] || 'Aktif'}</td><td>${escapeHtml(s.keterangan || '')}</td></tr>`; }); table += `</table>`; const blob = new Blob(['\ufeff' + table], { type: 'application/vnd.ms-excel' }); const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `Siswa_${rombel.nama}.xls`; a.click();
         }
 
         function logout() { CC.logout().finally(() => { window.location.href = 'index.html'; }); }
