@@ -163,7 +163,8 @@
         async function tambahRombel(e) {
             e.preventDefault();
             const nama = document.getElementById('add-nama-rombel').value.trim();
-            if(dbRombel.find(r => r.nama === nama)) return alert('Nama kelas sudah ada!');
+            const taAktif = dbSekolah.tahun_ajaran || '';
+            if (dbRombel.find(r => r.nama === nama && r.tahun_ajaran === taAktif)) return alert('Nama kelas sudah ada pada tahun ajaran ini!');
 
             try {
                 const baru = await CC.addRombel({

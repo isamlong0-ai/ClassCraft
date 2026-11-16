@@ -282,8 +282,10 @@
     async function getRombel() {
         if (sb) {
             try {
+                // Roster dibaca dari tabel riwayat penempatan `anggota_rombel`,
+                // bukan lagi kolom tunggal siswa.rombel_id.
                 var res = await sb.from('rombel')
-                    .select('id,tingkat,nama,wali_id,tahun_ajaran,siswa(id,nisn,nipd,nama,jk,status,tanggal_keluar,keterangan)')
+                    .select('id,tingkat,nama,wali_id,tahun_ajaran,anggota_rombel(siswa(id,nisn,nipd,nama,jk,status,tanggal_keluar,keterangan))')
                     .order('tahun_ajaran')
                     .order('nama');
                 if (res.error) throw res.error;
@@ -295,7 +297,10 @@
                         id: r.id, tingkat: r.tingkat, nama: r.nama,
                         tahun_ajaran: r.tahun_ajaran || '',
                         wali: r.wali_id ? (map[r.wali_id] || '-') : '-',
-                        siswa: (r.siswa || []).map(function (s) { return normalizeSiswa(s); })
+                        siswa: (r.anggota_rombel || [])
+                            .map(function (a) { return a.siswa; })
+                            .filter(Boolean)
+                            .map(normalizeSiswa)
                     };
                 });
                 lsSet(KEY.rombel, mapped); // simpan cache untuk mode offline
@@ -337,11 +342,21 @@
     async function addSiswa(rombelId, siswa) {
         var row = normalizeSiswa(siswa);
         if (sb) {
-            var res = await sb.from('siswa')
-                .insert({ rombel_id: rombelId, nisn: row.nisn, nipd: row.nipd, nama: row.nama, jk: row.jk })
+            var rb = await sb.from('rombel').select('tahun_ajaran').eq('id', rombelId).single();
+            if (rb.error) throw rb.error;
+            var ins = await sb.from('siswa')
+                .insert({ nisn: row.nisn, nipd: row.nipd, nama: row.nama, jk: row.jk })
                 .select().single();
-            if (res.error) throw res.error;
-            return normalizeSiswa(res.data);
+            if (ins.error) throw ins.error;
+            var enr = await sb.from('anggota_rombel').insert({
+                siswa_id: ins.data.id, rombel_id: rombelId, tahun_ajaran: rb.data.tahun_ajaran
+            });
+            if (enr.error) {
+                // batalkan agar tidak ada siswa tanpa penempatan
+                await sb.from('siswa').delete().eq('id', ins.data.id);
+                throw enr.error;
+            }
+            return normalizeSiswa(ins.data);
         }
         var rombel = lsGet(KEY.rombel, null) || DEFAULT_ROMBEL.slice();
         var target = rombel.find(function (r) { return r.id === rombelId; });
@@ -355,13 +370,24 @@
     async function importSiswa(rombelId, rows) {
         if (rows.length === 0) return 0;
         if (sb) {
+            var rb = await sb.from('rombel').select('tahun_ajaran').eq('id', rombelId).single();
+            if (rb.error) throw rb.error;
             var payload = rows.map(function (r) {
                 var s = normalizeSiswa(r);
-                return { rombel_id: rombelId, nisn: s.nisn, nipd: s.nipd, nama: s.nama, jk: s.jk };
+                return { nisn: s.nisn, nipd: s.nipd, nama: s.nama, jk: s.jk };
             });
             var res = await sb.from('siswa').insert(payload).select();
             if (res.error) throw res.error;
-            return (res.data || []).length;
+            var inserted = res.data || [];
+            if (inserted.length === 0) return 0;
+            var enr = await sb.from('anggota_rombel').insert(inserted.map(function (s) {
+                return { siswa_id: s.id, rombel_id: rombelId, tahun_ajaran: rb.data.tahun_ajaran };
+            }));
+            if (enr.error) {
+                await sb.from('siswa').delete().in('id', inserted.map(function (s) { return s.id; }));
+                throw enr.error;
+            }
+            return inserted.length;
         }
         var rombel = lsGet(KEY.rombel, null) || DEFAULT_ROMBEL.slice();
         var target = rombel.find(function (r) { return r.id === rombelId; });
@@ -370,6 +396,26 @@
         rows.forEach(function (r) { target.siswa.push(normalizeSiswa(r)); });
         lsSet(KEY.rombel, rombel);
         return rows.length;
+    }
+
+    // Riwayat penempatan kelas seorang siswa (semua tahun ajaran).
+    async function getRiwayatSiswa(siswaId) {
+        if (!sb) return [];
+        var res = await sb.from('anggota_rombel')
+            .select('tahun_ajaran,tanggal_masuk,tanggal_keluar,keterangan,rombel(id,nama,tingkat)')
+            .eq('siswa_id', siswaId)
+            .order('tahun_ajaran');
+        if (res.error) throw res.error;
+        return (res.data || []).map(function (a) {
+            return {
+                tahun_ajaran: a.tahun_ajaran,
+                rombel: a.rombel ? a.rombel.nama : '-',
+                tingkat: a.rombel ? a.rombel.tingkat : '-',
+                tanggal_masuk: a.tanggal_masuk,
+                tanggal_keluar: a.tanggal_keluar,
+                keterangan: a.keterangan || ''
+            };
+        });
     }
 
     // Ubah status siswa (aktif/lulus/pindah/berhenti) tanpa menghapus data.
@@ -401,6 +447,9 @@
             if (!cek.error && (cek.count || 0) > 0) {
                 throw new Error('Siswa memiliki riwayat presensi. Tandai sebagai Pindah/Berhenti, jangan hapus permanen.');
             }
+            // hapus penempatan lebih dulu (FK anggota_rombel on delete restrict)
+            var delEnr = await sb.from('anggota_rombel').delete().eq('siswa_id', siswaId);
+            if (delEnr.error) throw delEnr.error;
             var res = await sb.from('siswa').delete().eq('id', siswaId);
             if (res.error) throw res.error;
             return;
@@ -478,6 +527,7 @@
         importSiswa: importSiswa,
         deleteSiswa: deleteSiswa,
         setStatusSiswa: setStatusSiswa,
+        getRiwayatSiswa: getRiwayatSiswa,
         exportAll: exportAll,
         restoreAll: restoreAll,
         defaults: { users: DEFAULT_USERS, sekolah: DEFAULT_SEKOLAH, rombel: DEFAULT_ROMBEL }

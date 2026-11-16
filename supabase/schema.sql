@@ -59,11 +59,10 @@ create table if not exists public.rombel (
 );
 
 -- -------------------------------------------------------------
--- Tabel: siswa
+-- Tabel: siswa (identitas; penempatan kelas ada di anggota_rombel)
 -- -------------------------------------------------------------
 create table if not exists public.siswa (
     id             uuid primary key default gen_random_uuid(),
-    rombel_id      uuid references public.rombel(id) on delete cascade,
     nisn           text not null unique,
     nipd           text default '-',
     nama           text not null,
@@ -72,6 +71,22 @@ create table if not exists public.siswa (
     tanggal_keluar date,
     keterangan     text default '',
     created_at     timestamptz not null default now()
+);
+
+-- -------------------------------------------------------------
+-- Tabel: anggota_rombel (riwayat penempatan siswa per rombel per TA)
+-- Satu siswa = satu penempatan per tahun ajaran.
+-- -------------------------------------------------------------
+create table if not exists public.anggota_rombel (
+    id             uuid primary key default gen_random_uuid(),
+    siswa_id       uuid not null references public.siswa(id)  on delete restrict,
+    rombel_id      uuid not null references public.rombel(id) on delete restrict,
+    tahun_ajaran   text not null,
+    tanggal_masuk  date not null default current_date,
+    tanggal_keluar date,
+    keterangan     text default '',
+    created_at     timestamptz not null default now(),
+    unique (siswa_id, tahun_ajaran)
 );
 
 -- -------------------------------------------------------------
@@ -151,8 +166,9 @@ create table if not exists public.paket_soal (
 -- -------------------------------------------------------------
 create index if not exists idx_guru_role         on public.guru(role);
 create index if not exists idx_rombel_wali       on public.rombel(wali_id);
-create index if not exists idx_siswa_rombel      on public.siswa(rombel_id);
 create index if not exists idx_siswa_status      on public.siswa(status);
+create index if not exists idx_anggota_rombel_rombel on public.anggota_rombel(rombel_id);
+create index if not exists idx_anggota_rombel_ta     on public.anggota_rombel(tahun_ajaran);
 create index if not exists idx_modul_ajar_guru   on public.modul_ajar(guru_id);
 create index if not exists idx_modul_ajar_rombel on public.modul_ajar(rombel_id);
 
@@ -274,16 +290,17 @@ end $$;
 -- Row Level Security
 -- Baca: semua user yang login. Tulis: hanya admin.
 -- =============================================================
-alter table public.sekolah    enable row level security;
-alter table public.guru       enable row level security;
-alter table public.rombel     enable row level security;
-alter table public.siswa      enable row level security;
-alter table public.modul_ajar enable row level security;
+alter table public.sekolah        enable row level security;
+alter table public.guru           enable row level security;
+alter table public.rombel         enable row level security;
+alter table public.siswa          enable row level security;
+alter table public.anggota_rombel enable row level security;
+alter table public.modul_ajar     enable row level security;
 
 do $$
 declare t text;
 begin
-    foreach t in array array['sekolah', 'guru', 'rombel', 'siswa', 'modul_ajar'] loop
+    foreach t in array array['sekolah', 'guru', 'rombel', 'siswa', 'anggota_rombel', 'modul_ajar'] loop
         execute format('drop policy if exists "demo_all_%1$s" on public.%1$s;', t);
         execute format('drop policy if exists "read_%1$s" on public.%1$s;', t);
         execute format('drop policy if exists "admin_%1$s" on public.%1$s;', t);
@@ -295,11 +312,13 @@ create policy read_guru    on public.guru       for select to authenticated usin
 create policy read_rombel  on public.rombel     for select to authenticated using (true);
 create policy read_siswa   on public.siswa      for select to authenticated using (true);
 create policy read_modul   on public.modul_ajar for select to authenticated using (true);
+create policy read_anggota_rombel on public.anggota_rombel for select to authenticated using (true);
 
 create policy admin_sekolah on public.sekolah    for all to authenticated using (public.is_admin()) with check (public.is_admin());
 create policy admin_guru    on public.guru       for all to authenticated using (public.is_admin()) with check (public.is_admin());
 create policy admin_rombel  on public.rombel     for all to authenticated using (public.is_admin()) with check (public.is_admin());
 create policy admin_siswa   on public.siswa      for all to authenticated using (public.is_admin()) with check (public.is_admin());
+create policy admin_anggota_rombel on public.anggota_rombel for all to authenticated using (public.is_admin()) with check (public.is_admin());
 create policy write_modul   on public.modul_ajar for all to authenticated using (true) with check (true);
 
 -- Modul jurnal/presensi/paket soal: baca untuk user login,
@@ -368,10 +387,22 @@ insert into public.rombel (tingkat, nama, wali_id, tahun_ajaran)
 select 'Kelas 7', '7-A', (select id from public.guru where username = '198001012005011001'), '2025/2026'
 where not exists (select 1 from public.rombel where nama = '7-A');
 
-insert into public.siswa (rombel_id, nisn, nipd, nama, jk)
-select (select id from public.rombel where nama = '7-A'), '0081234561', '232407001', 'Ahmad Dahlan', 'L'
+insert into public.siswa (nisn, nipd, nama, jk)
+select '0081234561', '232407001', 'Ahmad Dahlan', 'L'
 where not exists (select 1 from public.siswa where nisn = '0081234561');
 
-insert into public.siswa (rombel_id, nisn, nipd, nama, jk)
-select (select id from public.rombel where nama = '7-A'), '0081234562', '232407002', 'Siti Walidah', 'P'
+insert into public.siswa (nisn, nipd, nama, jk)
+select '0081234562', '232407002', 'Siti Walidah', 'P'
 where not exists (select 1 from public.siswa where nisn = '0081234562');
+
+-- Penempatan awal siswa seed di rombel 7-A (2025/2026).
+insert into public.anggota_rombel (siswa_id, rombel_id, tahun_ajaran)
+select s.id, r.id, '2025/2026'
+  from public.siswa s
+  cross join public.rombel r
+ where s.nisn in ('0081234561', '0081234562')
+   and r.nama = '7-A' and r.tahun_ajaran = '2025/2026'
+   and not exists (
+       select 1 from public.anggota_rombel a
+        where a.siswa_id = s.id and a.tahun_ajaran = '2025/2026'
+   );
