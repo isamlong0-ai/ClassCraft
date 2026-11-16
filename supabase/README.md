@@ -36,6 +36,8 @@ dan database berada pada kondisi yang selaras (tidak ada migrasi tertunda).
 14. `20261116115247` — Tahap 3 RPC admin: `admin_naik_kelas(dari_ta, ke_ta, pengecualian, aktifkan)` + `admin_delete_guru(username)`
 15. `20261116115330` — Tahap 3 data: penetapan TA contoh per tingkat (Kelas 9 → 2024/2025, Kelas 8 tetap 2025/2026, Kelas 7 → 2026/2027)
 16. `20261116120305` — Tahap 3 perbaikan: `admin_naik_kelas` cabang `p_aktifkan` (`update sekolah` diberi WHERE agar lolos ekstensi `safeupdate`)
+17. `20261116122338` — Tahap 3 revisi: satukan tahun ajaran — semua rombel (Kelas 7, 8, 9) dikembalikan ke 2026/2027 (cascade ke `anggota_rombel`)
+18. `20261116122347` — Tahap 3 revisi: semester otomatis di `admin_naik_kelas` (Jan–Jun → Genap, Jul–Des → Ganjil)
 
 ## Menghubungkan ke GitHub (dashboard)
 

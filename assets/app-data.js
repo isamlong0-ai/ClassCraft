@@ -63,6 +63,13 @@
     function clearSession() { try { localStorage.removeItem(KEY.session); } catch (e) {} }
 
     // ---------- Sekolah ----------
+    // Semester otomatis dari tanggal: 6 bulan awal tahun (Jan-Jun) = Genap,
+    // 6 bulan berikutnya (Jul-Des) = Ganjil.
+    function semesterSaatIni(d) {
+        var bulan = (d ? new Date(d) : new Date()).getMonth() + 1; // 1..12
+        return bulan <= 6 ? 'Genap' : 'Ganjil';
+    }
+
     function mapSekolah(row) {
         return {
             nama: row.nama || DEFAULT_SEKOLAH.nama,
@@ -70,7 +77,7 @@
             kepsek: row.kepsek || '',
             nipKepsek: row.nip_kepsek || '',
             tahunAjaran: row.tahun_ajaran || DEFAULT_SEKOLAH.tahunAjaran,
-            semester: row.semester || DEFAULT_SEKOLAH.semester,
+            semester: semesterSaatIni(),
             imgKop: row.img_kop || '',
             imgTtd: row.img_ttd || ''
         };
@@ -87,7 +94,9 @@
                 }
             } catch (e) { console.warn('Gagal memuat sekolah dari Supabase, memakai cache:', e); }
         }
-        return lsGet(KEY.sekolah, null) || Object.assign({}, DEFAULT_SEKOLAH);
+        var cached = lsGet(KEY.sekolah, null) || Object.assign({}, DEFAULT_SEKOLAH);
+        cached.semester = semesterSaatIni();
+        return cached;
     }
 
     async function saveSekolah(data) {
@@ -526,7 +535,7 @@
         lsSet(KEY.rombel, rombel);
         if (aktifkan !== false) {
             var sek = await getSekolah();
-            sek.tahunAjaran = keTa; sek.semester = 'Ganjil';
+            sek.tahunAjaran = keTa; sek.semester = semesterSaatIni();
             await saveSekolah(sek);
         }
         return ringkas;
@@ -602,6 +611,7 @@
         getRiwayatSiswa: getRiwayatSiswa,
         naikKelas: naikKelas,
         tahunAjaranBerikutnya: tahunAjaranBerikutnya,
+        semesterSaatIni: semesterSaatIni,
         exportAll: exportAll,
         restoreAll: restoreAll,
         defaults: { users: DEFAULT_USERS, sekolah: DEFAULT_SEKOLAH, rombel: DEFAULT_ROMBEL }

@@ -127,7 +127,7 @@
                 </div>
                 <label class="flex items-center gap-2 text-xs text-slate-700">
                     <input type="checkbox" id="wiz-aktifkan" checked class="accent-indigo-600">
-                    Jadikan tahun ajaran tujuan sebagai tahun ajaran aktif (semester Ganjil)
+                    Jadikan tahun ajaran tujuan sebagai tahun ajaran aktif (semester ditentukan otomatis dari tanggal)
                 </label>
                 <div class="flex gap-2">
                     <button onclick="pratinjauWizard()" class="bg-slate-700 hover:bg-slate-800 text-white text-xs px-3 py-2 rounded font-medium"><i class="fas fa-eye mr-1"></i> Pratinjau</button>
@@ -554,7 +554,7 @@
                 renderTAOptions();
                 renderRombel();
                 tutupWizard();
-                alert(`Kenaikan kelas selesai.\n\nNaik: ${ringkas.naik}\nTinggal: ${ringkas.tinggal}\nLulus: ${ringkas.lulus}\nPindah: ${ringkas.pindah}\nBerhenti: ${ringkas.berhenti}`);
+                alert(`Kenaikan kelas selesai.\n\nNaik: ${ringkas.naik}\nTinggal: ${ringkas.tinggal}\nLulus: ${ringkas.lulus}\nPindah: ${ringkas.pindah}\nBerhenti: ${ringkas.berhenti}${ringkas.semester ? '\nSemester aktif: ' + ringkas.semester : ''}`);
             } catch (err) {
                 console.error(err);
                 alert('Gagal memproses kenaikan kelas: ' + (err.message || err));

@@ -296,6 +296,8 @@ declare
     v_target_tingkat text;
     v_target_rombel uuid;
     v_today date := current_date;
+    -- Semester otomatis: 6 bulan awal tahun (Jan-Jun) Genap, sisanya (Jul-Des) Ganjil.
+    v_semester text := case when extract(month from current_date) <= 6 then 'Genap' else 'Ganjil' end;
     v_naik int := 0; v_tinggal int := 0; v_lulus int := 0; v_pindah int := 0; v_berhenti int := 0;
 begin
     if not public.is_admin() then raise exception 'Akses ditolak: khusus admin'; end if;
@@ -366,13 +368,13 @@ begin
 
     if p_aktifkan then
         update public.sekolah
-           set tahun_ajaran = p_ke_ta, semester = 'Ganjil', updated_at = now()
+           set tahun_ajaran = p_ke_ta, semester = v_semester, updated_at = now()
          where id is not null;
     end if;
 
     return jsonb_build_object(
         'naik', v_naik, 'tinggal', v_tinggal, 'lulus', v_lulus,
-        'pindah', v_pindah, 'berhenti', v_berhenti
+        'pindah', v_pindah, 'berhenti', v_berhenti, 'semester', v_semester
     );
 end $$;
 
@@ -494,7 +496,7 @@ create policy write_paket_soal on public.paket_soal for all to authenticated
 -- Data awal (seed): sekolah, guru (+user Auth), rombel, siswa
 -- =============================================================
 insert into public.sekolah (nama, npsn, kepsek, nip_kepsek, tahun_ajaran, semester)
-select 'SMP Negeri 1 Indonesia', '10203040', 'Dr. H. Ahmad Dahlan M.Pd', '196805121992031002', '2025/2026', 'Ganjil'
+select 'SMP Negeri 1 Indonesia', '10203040', 'Dr. H. Ahmad Dahlan M.Pd', '196805121992031002', '2026/2027', 'Ganjil'
 where not exists (select 1 from public.sekolah);
 
 -- Buat user Auth + profil untuk tiap guru seed
@@ -535,7 +537,7 @@ begin
 end $$;
 
 insert into public.rombel (tingkat, nama, wali_id, tahun_ajaran)
-select 'Kelas 7', '7-A', (select id from public.guru where username = '198001012005011001'), '2025/2026'
+select 'Kelas 7', '7-A', (select id from public.guru where username = '198001012005011001'), '2026/2027'
 where not exists (select 1 from public.rombel where nama = '7-A');
 
 insert into public.siswa (nisn, nipd, nama, jk)
@@ -546,14 +548,14 @@ insert into public.siswa (nisn, nipd, nama, jk)
 select '0081234562', '232407002', 'Siti Walidah', 'P'
 where not exists (select 1 from public.siswa where nisn = '0081234562');
 
--- Penempatan awal siswa seed di rombel 7-A (2025/2026).
+-- Penempatan awal siswa seed di rombel 7-A (2026/2027).
 insert into public.anggota_rombel (siswa_id, rombel_id, tahun_ajaran)
-select s.id, r.id, '2025/2026'
+select s.id, r.id, '2026/2027'
   from public.siswa s
   cross join public.rombel r
  where s.nisn in ('0081234561', '0081234562')
-   and r.nama = '7-A' and r.tahun_ajaran = '2025/2026'
+   and r.nama = '7-A' and r.tahun_ajaran = '2026/2027'
    and not exists (
        select 1 from public.anggota_rombel a
-        where a.siswa_id = s.id and a.tahun_ajaran = '2025/2026'
+        where a.siswa_id = s.id and a.tahun_ajaran = '2026/2027'
    );

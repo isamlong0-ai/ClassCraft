@@ -318,9 +318,10 @@
                 npsn: '-',
                 kepsek: '-',
                 nip_kepsek: '-',
-                tahun_ajaran: '2025/2026',
+                tahun_ajaran: '2026/2027',
                 semester: 'Ganjil'
             };
+            profilSekolah.semester = CC.semesterSaatIni();
 
             document.getElementById('header-sekolah').innerText = profilSekolah.nama;
             document.getElementById('header-info').innerText = `${profilGuru.nama} | T.A. ${profilSekolah.tahun_ajaran} (${profilSekolah.semester})`;

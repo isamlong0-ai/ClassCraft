@@ -49,10 +49,11 @@
                     </div>
                     <div>
                         <label class="block text-xs font-bold text-indigo-900 mb-1">Semester Aktif</label>
-                        <select id="cfg-semester" class="w-full p-2 border rounded-lg text-sm bg-white font-semibold text-indigo-700">
-                            <option value="Ganjil">Semester Ganjil</option>
-                            <option value="Genap">Semester Genap</option>
+                        <select id="cfg-semester" disabled class="w-full p-2 border rounded-lg text-sm bg-slate-100 font-semibold text-slate-500 cursor-not-allowed">
+                            <option value="Ganjil">Semester Ganjil (Jul–Des)</option>
+                            <option value="Genap">Semester Genap (Jan–Jun)</option>
                         </select>
+                        <p class="text-[10px] text-slate-500 mt-1"><i class="fas fa-clock mr-1"></i>Otomatis dari tanggal: Jan–Jun = Genap, Jul–Des = Ganjil.</p>
                     </div>
                 </div>
 
@@ -181,7 +182,7 @@
             dbSekolah.kepsek = document.getElementById('cfg-kepsek').value.trim();
             dbSekolah.nipKepsek = document.getElementById('cfg-kepsek-nip').value.trim();
             dbSekolah.tahunAjaran = document.getElementById('cfg-ta').value;
-            dbSekolah.semester = document.getElementById('cfg-semester').value;
+            dbSekolah.semester = CC.semesterSaatIni();
 
             try {
                 await CC.saveSekolah(dbSekolah);
