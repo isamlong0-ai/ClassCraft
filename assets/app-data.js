@@ -162,6 +162,18 @@
         if (idx !== -1) { users[idx].pass = newPass; lsSet(KEY.users, users); }
     }
 
+    // Hapus guru + akun Auth-nya (khusus admin). Menolak admin, akun sendiri,
+    // dan guru yang punya catatan presensi (dilakukan oleh RPC di server).
+    async function deleteUser(username) {
+        if (sb) {
+            var res = await sb.rpc('admin_delete_guru', { p_username: username });
+            if (res.error) throw res.error;
+            return;
+        }
+        var users = seedUsersLocal().filter(function (x) { return x.username !== username; });
+        lsSet(KEY.users, users);
+    }
+
     // Profil guru milik user yang sedang login (dipakai ulang beberapa fungsi).
     async function fetchProfile(authUserId) {
         var prof = await sb.from('guru')
@@ -324,7 +336,7 @@
             var ta = data.tahun_ajaran;
             if (!ta) {
                 var sek = await getSekolah();
-                ta = (sek && sek.tahun_ajaran) || '2025/2026';
+                ta = (sek && sek.tahunAjaran) || '2025/2026';
             }
             var res = await sb.from('rombel')
                 .insert({ tingkat: data.tingkat, nama: data.nama, wali_id: waliId, tahun_ajaran: ta })
@@ -334,7 +346,7 @@
         }
         var rombel = await getRombel();
         var sekOff = await getSekolah();
-        rombel.push({ id: data.nama, tingkat: data.tingkat, nama: data.nama, tahun_ajaran: data.tahun_ajaran || (sekOff && sekOff.tahun_ajaran) || '2025/2026', wali: data.wali || '-', siswa: [] });
+        rombel.push({ id: data.nama, tingkat: data.tingkat, nama: data.nama, tahun_ajaran: data.tahun_ajaran || (sekOff && sekOff.tahunAjaran) || '2025/2026', wali: data.wali || '-', siswa: [] });
         lsSet(KEY.rombel, rombel);
         return rombel[rombel.length - 1];
     }
@@ -461,6 +473,65 @@
         lsSet(KEY.rombel, rombel);
     }
 
+    // Tahun ajaran berikutnya: '2025/2026' -> '2026/2027'.
+    function tahunAjaranBerikutnya(ta) {
+        var m = String(ta || '').match(/^(\d{4})\s*\/\s*(\d{4})$/);
+        if (!m) return '';
+        return (parseInt(m[1], 10) + 1) + '/' + (parseInt(m[2], 10) + 1);
+    }
+
+    // Proses kenaikan kelas massal (khusus admin).
+    //   dariTa / keTa : tahun ajaran asal & tujuan.
+    //   pengecualian  : { siswaId: 'naik'|'tinggal'|'lulus'|'pindah'|'berhenti' }.
+    //   aktifkan      : set sekolah.tahun_ajaran = keTa (default true).
+    // Mengembalikan ringkasan { naik, tinggal, lulus, pindah, berhenti }.
+    async function naikKelas(dariTa, keTa, pengecualian, aktifkan) {
+        if (sb) {
+            var res = await sb.rpc('admin_naik_kelas', {
+                p_dari_ta: dariTa, p_ke_ta: keTa,
+                p_pengecualian: pengecualian || {},
+                p_aktifkan: aktifkan !== false
+            });
+            if (res.error) throw res.error;
+            return res.data;
+        }
+        var rombel = await getRombel();
+        var sumber = rombel.filter(function (r) { return r.tahun_ajaran === dariTa; });
+        var ringkas = { naik: 0, tinggal: 0, lulus: 0, pindah: 0, berhenti: 0 };
+        var today = new Date().toISOString().slice(0, 10);
+        sumber.forEach(function (r) {
+            (r.siswa || []).forEach(function (s) {
+                if (s.status && s.status !== 'aktif') return;
+                var aksi = (pengecualian && pengecualian[s.id]) || (r.tingkat === 'Kelas 9' ? 'lulus' : 'naik');
+                if (aksi === 'lulus' || aksi === 'pindah' || aksi === 'berhenti') {
+                    ringkas[aksi]++; s.status = aksi; s.tanggal_keluar = today; return;
+                }
+                var namaBaru = r.nama, tingkatBaru = r.tingkat;
+                if (aksi !== 'tinggal') {
+                    var m = String(r.nama).match(/^(\d+)(.*)$/);
+                    if (m) {
+                        namaBaru = (parseInt(m[1], 10) + 1) + m[2];
+                        tingkatBaru = 'Kelas ' + (parseInt(m[1], 10) + 1);
+                    }
+                    ringkas.naik++;
+                } else { ringkas.tinggal++; }
+                var tgt = rombel.find(function (x) { return x.nama === namaBaru && x.tahun_ajaran === keTa; });
+                if (!tgt) {
+                    tgt = { id: namaBaru + '-' + keTa, nama: namaBaru, tingkat: tingkatBaru, tahun_ajaran: keTa, wali: '-', siswa: [] };
+                    rombel.push(tgt);
+                }
+                tgt.siswa.push(Object.assign({}, s));
+            });
+        });
+        lsSet(KEY.rombel, rombel);
+        if (aktifkan !== false) {
+            var sek = await getSekolah();
+            sek.tahunAjaran = keTa; sek.semester = 'Ganjil';
+            await saveSekolah(sek);
+        }
+        return ringkas;
+    }
+
     // ---------- Backup / Restore ----------
     async function exportAll() {
         var users = await getUsers();
@@ -517,6 +588,7 @@
         requireAuth: requireAuth,
         changePassword: changePassword,
         resetPassword: resetPassword,
+        deleteUser: deleteUser,
         getSekolah: getSekolah,
         saveSekolah: saveSekolah,
         getUsers: getUsers,
@@ -528,6 +600,8 @@
         deleteSiswa: deleteSiswa,
         setStatusSiswa: setStatusSiswa,
         getRiwayatSiswa: getRiwayatSiswa,
+        naikKelas: naikKelas,
+        tahunAjaranBerikutnya: tahunAjaranBerikutnya,
         exportAll: exportAll,
         restoreAll: restoreAll,
         defaults: { users: DEFAULT_USERS, sekolah: DEFAULT_SEKOLAH, rombel: DEFAULT_ROMBEL }

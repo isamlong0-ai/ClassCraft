@@ -131,6 +131,7 @@
                     <td class="p-2.5">${escapeHtml(g.pangkat || '-')} / ${escapeHtml(g.gol || '-')}</td>
                     <td class="p-2.5 text-center">
                         <button onclick="resetPass('${escapeHtml(g.username)}')" class="bg-amber-500 hover:bg-amber-600 text-white text-[10px] px-2 py-1 rounded transition">Reset Pass</button>
+                        <button onclick="hapusGuru('${escapeHtml(g.username)}', '${escapeHtml(g.nama)}')" class="bg-red-600 hover:bg-red-700 text-white text-[10px] px-2 py-1 rounded transition ml-1"><i class="fas fa-trash-alt mr-1"></i>Hapus</button>
                     </td>
                 `;
                 tbody.appendChild(tr);
@@ -200,6 +201,19 @@
             } catch (err) {
                 console.error(err);
                 alert('Gagal reset password: ' + (err.message || err));
+            }
+        }
+
+        async function hapusGuru(nip, nama) {
+            if (!confirm(`Hapus guru "${nama}" (NIP ${nip})?\n\nAkun login dan profilnya akan dihapus permanen. Tindakan ini tidak dapat dibatalkan.`)) return;
+            try {
+                await CC.deleteUser(nip);
+                dbUsers = dbUsers.filter(u => u.username !== nip);
+                renderTable();
+                alert('Guru berhasil dihapus.');
+            } catch (err) {
+                console.error(err);
+                alert('Gagal menghapus guru: ' + (err.message || err));
             }
         }
 

@@ -28,9 +28,22 @@
     </header>
 
     <main class="max-w-7xl mx-auto px-4 py-6 w-full flex-1">
+        <div class="bg-white p-4 rounded-xl shadow-md border mb-4 flex flex-wrap items-center gap-3 justify-between">
+            <div class="flex flex-wrap items-center gap-2">
+                <label class="text-xs font-bold text-slate-700"><i class="fas fa-calendar-alt mr-1 text-indigo-600"></i>Tahun Ajaran:</label>
+                <select id="select-tahun-ajaran" onchange="gantiTA()" class="p-1.5 border rounded text-xs font-bold text-indigo-700 bg-indigo-50"></select>
+                <span id="badge-ta-mode" class="text-[10px] px-2 py-0.5 rounded font-bold"></span>
+            </div>
+            <button onclick="bukaWizard()" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs px-3 py-2 rounded-lg font-medium transition"><i class="fas fa-arrow-up-right-dots mr-1"></i> Kenaikan Kelas</button>
+        </div>
+
+        <div id="note-arsip" class="hidden mb-4 p-3 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-xs">
+            <i class="fas fa-lock mr-1"></i> Mode arsip: tahun ajaran ini sudah tidak aktif, data hanya dapat dilihat (read-only).
+        </div>
+
         <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
             
-            <div class="bg-white p-6 rounded-xl shadow-md border space-y-4">
+            <div id="card-buat" class="bg-white p-6 rounded-xl shadow-md border space-y-4">
                 <h2 class="text-base font-bold text-indigo-700 border-b pb-2"><i class="fas fa-plus-circle mr-2"></i>Buat Rombel Baru</h2>
                 <form onsubmit="tambahRombel(event)" class="space-y-3">
                     <select id="add-tingkat" class="w-full p-2 border rounded text-xs">
@@ -59,7 +72,7 @@
                     </div>
                 </div>
 
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 bg-slate-50 p-3 rounded-lg border">
+                <div id="panel-input-siswa" class="grid grid-cols-1 md:grid-cols-2 gap-4 bg-slate-50 p-3 rounded-lg border">
                     <div>
                         <h3 class="text-xs font-bold text-slate-700 mb-1">Upload Massal Siswa</h3>
                         <p class="text-[10px] text-slate-500 mb-1">Format: <code class="bg-white p-0.5 border">NISN, NIPD, Nama, JK (L/P)</code></p>
@@ -94,6 +107,40 @@
         </div>
     </main>
 
+    <!-- Wizard Kenaikan Kelas -->
+    <div id="modal-wizard" class="hidden fixed inset-0 bg-black/50 z-[60] overflow-y-auto p-4">
+        <div class="bg-white rounded-xl shadow-xl w-full max-w-3xl mx-auto my-6">
+            <div class="flex justify-between items-center p-4 border-b">
+                <h3 class="font-bold text-indigo-700"><i class="fas fa-arrow-up-right-dots mr-2"></i>Wizard Kenaikan Kelas</h3>
+                <button onclick="tutupWizard()" class="text-slate-400 hover:text-slate-700 text-xl leading-none">&times;</button>
+            </div>
+            <div class="p-4 space-y-4">
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1">Dari Tahun Ajaran</label>
+                        <select id="wiz-dari" onchange="syncWizKe()" class="w-full p-2 border rounded text-xs"></select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1">Ke Tahun Ajaran</label>
+                        <input type="text" id="wiz-ke" placeholder="2026/2027" class="w-full p-2 border rounded text-xs font-mono">
+                    </div>
+                </div>
+                <label class="flex items-center gap-2 text-xs text-slate-700">
+                    <input type="checkbox" id="wiz-aktifkan" checked class="accent-indigo-600">
+                    Jadikan tahun ajaran tujuan sebagai tahun ajaran aktif (semester Ganjil)
+                </label>
+                <div class="flex gap-2">
+                    <button onclick="pratinjauWizard()" class="bg-slate-700 hover:bg-slate-800 text-white text-xs px-3 py-2 rounded font-medium"><i class="fas fa-eye mr-1"></i> Pratinjau</button>
+                </div>
+                <div id="wiz-hasil" class="text-xs"></div>
+            </div>
+            <div id="wiz-footer" class="hidden p-4 border-t flex justify-end gap-2">
+                <button onclick="tutupWizard()" class="bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs px-3 py-2 rounded font-medium">Batal</button>
+                <button onclick="terapkanWizard()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs px-3 py-2 rounded font-medium"><i class="fas fa-check mr-1"></i> Terapkan Kenaikan Kelas</button>
+            </div>
+        </div>
+    </div>
+
     <script>
         let session = CC.getSession();
 
@@ -109,6 +156,8 @@
         let dbUsers = [];
         let dbSekolah = Object.assign({}, CC.defaults.sekolah);
         let dbRombel = [];
+        let currentTA = '';
+        let wizPlan = null;
 
         document.addEventListener('DOMContentLoaded', async () => {
             try {
@@ -121,9 +170,58 @@
                 alert('Gagal memuat data dari server. Menampilkan data tersimpan.');
             }
             document.getElementById('header-sekolah').innerText = dbSekolah.nama;
+            currentTA = dbSekolah.tahunAjaran || (dbRombel[0] && dbRombel[0].tahun_ajaran) || '';
             loadWaliList();
+            renderTAOptions();
             renderRombel();
         });
+
+        // Daftar tahun ajaran (dari rombel + TA aktif sekolah), terurut.
+        function tahunAjaranList() {
+            const set = {};
+            dbRombel.forEach(r => { if (r.tahun_ajaran) set[r.tahun_ajaran] = true; });
+            if (dbSekolah.tahunAjaran) set[dbSekolah.tahunAjaran] = true;
+            return Object.keys(set).sort();
+        }
+
+        // Tahun ajaran ini arsip? (bukan TA aktif sekolah)
+        function isArsip() {
+            return currentTA !== (dbSekolah.tahunAjaran || '');
+        }
+
+        function renderTAOptions() {
+            const sel = document.getElementById('select-tahun-ajaran');
+            const list = tahunAjaranList();
+            if (list.indexOf(currentTA) === -1) currentTA = list[list.length - 1] || '';
+            sel.innerHTML = list.map(ta => `<option value="${escapeHtml(ta)}">${escapeHtml(ta)}</option>`).join('');
+            if (currentTA) sel.value = currentTA;
+            updateTAMode();
+        }
+
+        function updateTAMode() {
+            const arsip = isArsip();
+            document.getElementById('note-arsip').classList.toggle('hidden', !arsip);
+            const badge = document.getElementById('badge-ta-mode');
+            if (arsip) {
+                badge.className = 'text-[10px] px-2 py-0.5 rounded font-bold bg-amber-100 text-amber-700';
+                badge.textContent = 'Arsip (read-only)';
+            } else {
+                badge.className = 'text-[10px] px-2 py-0.5 rounded font-bold bg-emerald-100 text-emerald-700';
+                badge.textContent = 'Aktif';
+            }
+            // Nonaktifkan form input saat mode arsip.
+            ['card-buat', 'panel-input-siswa'].forEach(id => {
+                const root = document.getElementById(id);
+                if (!root) return;
+                root.querySelectorAll('input,select,button,textarea').forEach(el => { el.disabled = arsip; });
+            });
+        }
+
+        function gantiTA() {
+            currentTA = document.getElementById('select-tahun-ajaran').value;
+            updateTAMode();
+            renderRombel();
+        }
 
         function escapeHtml(value) {
             return String(value == null ? '' : value)
@@ -145,7 +243,15 @@
             const prevActive = selectActive.value;
             cardContainer.innerHTML = ''; selectActive.innerHTML = '';
 
-            dbRombel.forEach(r => {
+            const daftar = dbRombel.filter(r => r.tahun_ajaran === currentTA);
+
+            if (daftar.length === 0) {
+                cardContainer.innerHTML = `<div class="text-[10px] text-slate-400 p-2">Belum ada kelas pada tahun ajaran ${escapeHtml(currentTA || '-')}.</div>`;
+                renderSiswa();
+                return;
+            }
+
+            daftar.forEach(r => {
                 const aktifCount = r.siswa.filter(s => (s.status || 'aktif') === 'aktif').length;
                 cardContainer.innerHTML += `<div class="p-2 bg-slate-50 border rounded text-xs flex justify-between gap-2">
                     <div><b>${escapeHtml(r.nama)}</b> <span class="text-[10px] text-slate-500">(${escapeHtml(r.tingkat)}${r.tahun_ajaran ? ' · ' + escapeHtml(r.tahun_ajaran) : ''})</span></div>
@@ -154,7 +260,7 @@
                 selectActive.innerHTML += `<option value="${escapeHtml(r.id)}">Kelas ${escapeHtml(r.nama)}${r.tahun_ajaran ? ' — ' + escapeHtml(r.tahun_ajaran) : ''}</option>`;
             });
 
-            if (prevActive && dbRombel.some(r => r.id === prevActive)) {
+            if (prevActive && daftar.some(r => r.id === prevActive)) {
                 selectActive.value = prevActive;
             }
             renderSiswa();
@@ -162,15 +268,17 @@
 
         async function tambahRombel(e) {
             e.preventDefault();
+            if (isArsip()) return alert('Tidak dapat menambah kelas pada tahun ajaran arsip. Pilih tahun ajaran aktif terlebih dahulu.');
             const nama = document.getElementById('add-nama-rombel').value.trim();
-            const taAktif = dbSekolah.tahun_ajaran || '';
+            const taAktif = currentTA || dbSekolah.tahunAjaran || '';
             if (dbRombel.find(r => r.nama === nama && r.tahun_ajaran === taAktif)) return alert('Nama kelas sudah ada pada tahun ajaran ini!');
 
             try {
                 const baru = await CC.addRombel({
                     tingkat: document.getElementById('add-tingkat').value,
                     nama: nama,
-                    wali: document.getElementById('add-wali').value
+                    wali: document.getElementById('add-wali').value,
+                    tahun_ajaran: taAktif
                 });
                 dbRombel.push(baru);
                 renderRombel();
@@ -218,13 +326,16 @@
                     ? `<button onclick="ubahStatus('${escapeHtml(s.id)}','pindah')" class="text-amber-600 hover:text-amber-800 transition" title="Tandai pindah"><i class="fas fa-right-from-bracket"></i></button>
                        <button onclick="ubahStatus('${escapeHtml(s.id)}','berhenti')" class="text-rose-500 hover:text-rose-700 transition" title="Tandai berhenti"><i class="fas fa-user-slash"></i></button>`
                     : `<button onclick="ubahStatus('${escapeHtml(s.id)}','aktif')" class="text-emerald-600 hover:text-emerald-800 transition" title="Aktifkan kembali"><i class="fas fa-rotate-left"></i></button>`;
+                const aksi = isArsip()
+                    ? `<span class="text-[10px] text-slate-400">arsip</span>`
+                    : `${tombolStatus}
+                        <button onclick="hapusSiswa('${escapeHtml(s.id)}')" class="text-slate-400 hover:text-red-600 transition" title="Hapus permanen (salah input)"><i class="fas fa-trash"></i></button>`;
                 tbody.innerHTML += `<tr class="${aktif ? '' : 'opacity-60'}">
                     <td class="p-2">${idx+1}</td><td class="p-2 font-mono">${escapeHtml(s.nisn)}</td><td class="p-2 font-mono">${escapeHtml(s.nipd || '-')}</td>
                     <td class="p-2 font-medium">${escapeHtml(s.nama)}</td><td class="p-2 text-center">${escapeHtml(s.jk)}</td>
                     <td class="p-2 text-center">${statusBadge(status)}</td>
                     <td class="p-2 text-center space-x-2 whitespace-nowrap">
-                        ${tombolStatus}
-                        <button onclick="hapusSiswa('${escapeHtml(s.id)}')" class="text-slate-400 hover:text-red-600 transition" title="Hapus permanen (salah input)"><i class="fas fa-trash"></i></button>
+                        ${aksi}
                     </td>
                 </tr>`;
             });
@@ -328,6 +439,126 @@
             const daftar = hanyaAktif ? rombel.siswa.filter(s => (s.status || 'aktif') === 'aktif') : rombel.siswa;
             let table = `<table border="1"><tr><th colspan="7">DAFTAR SISWA KELAS ${escapeHtml(rombel.nama)}${rombel.tahun_ajaran ? ' — ' + escapeHtml(rombel.tahun_ajaran) : ''}</th></tr><tr><th>No</th><th>NISN</th><th>NIPD</th><th>Nama</th><th>JK</th><th>Status</th><th>Keterangan</th></tr>`;
             daftar.forEach((s, idx) => { table += `<tr><td>${idx+1}</td><td>'${escapeHtml(s.nisn)}</td><td>${escapeHtml(s.nipd || '-')}</td><td>${escapeHtml(s.nama)}</td><td>${escapeHtml(s.jk)}</td><td>${STATUS_LABEL[s.status] || 'Aktif'}</td><td>${escapeHtml(s.keterangan || '')}</td></tr>`; }); table += `</table>`; const blob = new Blob(['\ufeff' + table], { type: 'application/vnd.ms-excel' }); const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `Siswa_${rombel.nama}.xls`; a.click();
+        }
+
+        // ---------- Wizard kenaikan kelas ----------
+        const AKSI_LABEL = { naik: 'Naik kelas', tinggal: 'Tinggal kelas', lulus: 'Lulus', pindah: 'Pindah', berhenti: 'Berhenti' };
+
+        function bukaWizard() {
+            const list = tahunAjaranList();
+            const sel = document.getElementById('wiz-dari');
+            sel.innerHTML = list.map(ta => `<option value="${escapeHtml(ta)}">${escapeHtml(ta)}</option>`).join('');
+            sel.value = currentTA || dbSekolah.tahunAjaran || list[list.length - 1] || '';
+            syncWizKe();
+            document.getElementById('wiz-hasil').innerHTML = '';
+            document.getElementById('wiz-footer').classList.add('hidden');
+            wizPlan = null;
+            document.getElementById('modal-wizard').classList.remove('hidden');
+        }
+
+        function tutupWizard() {
+            document.getElementById('modal-wizard').classList.add('hidden');
+        }
+
+        function syncWizKe() {
+            const dari = document.getElementById('wiz-dari').value;
+            document.getElementById('wiz-ke').value = CC.tahunAjaranBerikutnya(dari) || '';
+        }
+
+        function pratinjauWizard() {
+            const dariTa = document.getElementById('wiz-dari').value;
+            const keTa = document.getElementById('wiz-ke').value.trim();
+            if (!dariTa || !keTa) return alert('Isi tahun ajaran asal dan tujuan.');
+            if (dariTa === keTa) return alert('Tahun ajaran asal dan tujuan harus berbeda.');
+
+            const sumber = dbRombel.filter(r => r.tahun_ajaran === dariTa);
+            if (sumber.length === 0) return alert('Tidak ada kelas pada tahun ajaran asal.');
+
+            const siswa = [];
+            sumber.forEach(r => {
+                r.siswa.forEach(s => {
+                    if ((s.status || 'aktif') !== 'aktif') return;
+                    const def = r.tingkat === 'Kelas 9' ? 'lulus' : 'naik';
+                    siswa.push({ id: s.id, nama: s.nama, kelas: r.nama, tingkat: r.tingkat, aksi: def });
+                });
+            });
+            if (siswa.length === 0) return alert('Tidak ada siswa aktif pada tahun ajaran asal.');
+
+            wizPlan = { dariTa, keTa, aktifkan: document.getElementById('wiz-aktifkan').checked, siswa };
+            renderWizardPreview();
+        }
+
+        function renderWizardPreview() {
+            const p = wizPlan;
+            const grup = {};
+            p.siswa.forEach(s => { (grup[s.kelas] = grup[s.kelas] || []).push(s); });
+
+            let html = `<div class="bg-slate-50 border rounded-lg p-3 mb-2">
+                <div class="font-bold text-slate-700 mb-1">Ringkasan: ${escapeHtml(p.dariTa)} → ${escapeHtml(p.keTa)}</div>
+                <div>Total siswa aktif: <b>${p.siswa.length}</b>${p.aktifkan ? ' · tahun ajaran tujuan akan dijadikan <b>aktif</b>' : ''}</div>
+                <div class="text-slate-500 mt-1">Default: naik satu tingkat; Kelas 9 lulus. Ubah bila ada pengecualian.</div>
+            </div>`;
+
+            Object.keys(grup).sort().forEach(kelas => {
+                const rows = grup[kelas];
+                const tingkat = rows[0].tingkat;
+                const target = tingkat === 'Kelas 9' ? '—' : 'Kelas ' + (parseInt(String(tingkat).replace(/\D/g, ''), 10) + 1);
+                html += `<div class="border rounded-lg mb-2 overflow-hidden">
+                    <div class="bg-indigo-50 px-2 py-1 flex items-center justify-between">
+                        <span class="font-bold text-indigo-700">Kelas ${escapeHtml(kelas)} → ${escapeHtml(target)} <span class="text-slate-400 font-normal">(${rows.length} siswa)</span></span>
+                        <select onchange="setAksiKelas('${escapeHtml(kelas)}', this.value)" class="text-[10px] border rounded p-0.5">
+                            <option value="">Semua →</option>
+                            ${Object.keys(AKSI_LABEL).map(a => `<option value="${a}">${AKSI_LABEL[a]}</option>`).join('')}
+                        </select>
+                    </div>
+                    <div class="max-h-40 overflow-y-auto divide-y">`;
+                rows.forEach(s => {
+                    html += `<div class="flex items-center justify-between px-2 py-1">
+                        <span>${escapeHtml(s.nama)}</span>
+                        <select onchange="setAksiSiswa('${escapeHtml(s.id)}', this.value)" class="text-[10px] border rounded p-0.5">
+                            ${Object.keys(AKSI_LABEL).map(a => `<option value="${a}" ${s.aksi === a ? 'selected' : ''}>${AKSI_LABEL[a]}</option>`).join('')}
+                        </select>
+                    </div>`;
+                });
+                html += `</div></div>`;
+            });
+
+            document.getElementById('wiz-hasil').innerHTML = html;
+            document.getElementById('wiz-footer').classList.remove('hidden');
+        }
+
+        function setAksiSiswa(id, aksi) {
+            const s = wizPlan.siswa.find(x => x.id === id);
+            if (s) s.aksi = aksi;
+        }
+
+        function setAksiKelas(kelas, aksi) {
+            if (!aksi) return;
+            wizPlan.siswa.forEach(s => { if (s.kelas === kelas) s.aksi = aksi; });
+            renderWizardPreview();
+        }
+
+        async function terapkanWizard() {
+            if (!wizPlan) return alert('Lakukan pratinjau terlebih dahulu.');
+            const pengecualian = {};
+            wizPlan.siswa.forEach(s => {
+                const def = s.tingkat === 'Kelas 9' ? 'lulus' : 'naik';
+                if (s.aksi !== def) pengecualian[s.id] = s.aksi;
+            });
+            if (!confirm(`Terapkan kenaikan kelas ${wizPlan.dariTa} → ${wizPlan.keTa} untuk ${wizPlan.siswa.length} siswa?`)) return;
+            try {
+                const ringkas = await CC.naikKelas(wizPlan.dariTa, wizPlan.keTa, pengecualian, wizPlan.aktifkan);
+                dbRombel = await CC.getRombel();
+                dbSekolah = await CC.getSekolah();
+                if (wizPlan.aktifkan) currentTA = wizPlan.keTa;
+                renderTAOptions();
+                renderRombel();
+                tutupWizard();
+                alert(`Kenaikan kelas selesai.\n\nNaik: ${ringkas.naik}\nTinggal: ${ringkas.tinggal}\nLulus: ${ringkas.lulus}\nPindah: ${ringkas.pindah}\nBerhenti: ${ringkas.berhenti}`);
+            } catch (err) {
+                console.error(err);
+                alert('Gagal memproses kenaikan kelas: ' + (err.message || err));
+            }
         }
 
         function logout() { CC.logout().finally(() => { window.location.href = 'index.html'; }); }

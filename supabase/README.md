@@ -32,6 +32,10 @@ dan database berada pada kondisi yang selaras (tidak ada migrasi tertunda).
 10. `20261116113815` — Tahap 1 tahun ajaran: `rombel` (rapikan `tingkat`, `tahun_ajaran` NOT NULL, unique `(nama, tahun_ajaran)`) + `siswa` (`status`/`tanggal_keluar`/`keterangan`, `rombel_id` nullable, `nisn` unik global)
 11. `20261116114405` — Tahap 2: tabel riwayat penempatan `anggota_rombel` (+ index, RLS) + backfill dari `siswa.rombel_id`
 12. `20261116114532` — Tahap 2: hapus kolom `siswa.rombel_id` (digantikan `anggota_rombel`)
+13. `20261116115205` — Tahap 3: FK komposit `anggota_rombel(rombel_id, tahun_ajaran) → rombel(id, tahun_ajaran)` (ON UPDATE CASCADE / ON DELETE RESTRICT) + unique `rombel(id, tahun_ajaran)`
+14. `20261116115247` — Tahap 3 RPC admin: `admin_naik_kelas(dari_ta, ke_ta, pengecualian, aktifkan)` + `admin_delete_guru(username)`
+15. `20261116115330` — Tahap 3 data: penetapan TA contoh per tingkat (Kelas 9 → 2024/2025, Kelas 8 tetap 2025/2026, Kelas 7 → 2026/2027)
+16. `20261116120305` — Tahap 3 perbaikan: `admin_naik_kelas` cabang `p_aktifkan` (`update sekolah` diberi WHERE agar lolos ekstensi `safeupdate`)
 
 ## Menghubungkan ke GitHub (dashboard)
 
