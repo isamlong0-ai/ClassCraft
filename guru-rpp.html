@@ -59,7 +59,7 @@
                     <h3 class="font-bold text-indigo-800 border-b pb-1"><i class="fas fa-sliders-h mr-1"></i> Parameter Pembelajaran</h3>
                     
                     <div>
-                        <label class="block font-semibold mb-1">Target Kelas / Rombel</label>
+                        <label class="block font-semibold mb-1">Target Kelas (Jenjang)</label>
                         <select id="cfg-rombel" class="w-full p-2 border rounded-lg bg-white"></select>
                     </div>
 
@@ -169,10 +169,12 @@
             document.getElementById('header-sekolah').innerText = dbSekolah.nama;
             const sel = document.getElementById('cfg-rombel');
             sel.innerHTML = '';
-            if (dbRombel.length === 0) {
+            // Target Modul Ajar per jenjang (Kelas 7/8/9), bukan per nama rombel.
+            const jenjang = [...new Set(dbRombel.map(r => r.tingkat).filter(Boolean))].sort();
+            if (jenjang.length === 0) {
                 sel.innerHTML = `<option value="">Belum ada kelas</option>`;
             } else {
-                dbRombel.forEach(r => { sel.innerHTML += `<option value="${escapeHtml(r.nama)}">${escapeHtml(r.tingkat)} - Kelas ${escapeHtml(r.nama)}</option>`; });
+                jenjang.forEach(tk => { sel.innerHTML += `<option value="${escapeHtml(tk)}">${escapeHtml(tk)}</option>`; });
             }
         });
 
@@ -212,8 +214,8 @@ Peserta didik mampu menginisiasi kegiatan bersama dalam merawat keberagaman suku
                 return;
             }
 
-            const rombelNama = document.getElementById('cfg-rombel').value;
-            const rombel = dbRombel.find(r => r.nama === rombelNama) || { tingkat: 'Kelas 7', nama: '7-A' };
+            const tingkat = document.getElementById('cfg-rombel').value;
+            const rombel = { tingkat: tingkat || 'Kelas 7' };
             const semester = document.getElementById('cfg-semester').value;
             const model = document.getElementById('cfg-model').value;
             const waktu = document.getElementById('cfg-jp').value;
@@ -384,7 +386,7 @@ Peserta didik mampu menginisiasi kegiatan bersama dalam merawat keberagaman suku
                 ${kopHtml}
                 <div class="text-center font-bold mb-4">
                     <h2 class="text-sm uppercase text-indigo-900">PERANGKAT MODUL AJAR / RPP UTUH SEKALIGUS</h2>
-                    <p class="text-xs font-normal">Penyusun: <b>${escapeHtml(session.nama)}</b> (NIP: ${escapeHtml(session.username)}) | Mapel: <b>${escapeHtml(session.mapel)}</b> | ${escapeHtml(rombel.tingkat)} (${escapeHtml(rombel.nama)})</p>
+                    <p class="text-xs font-normal">Penyusun: <b>${escapeHtml(session.nama)}</b> (NIP: ${escapeHtml(session.username)}) | Mapel: <b>${escapeHtml(session.mapel)}</b> | ${escapeHtml(rombel.tingkat)}</p>
                 </div>
 
                 <div class="space-y-4">
@@ -400,10 +402,10 @@ Peserta didik mampu menginisiasi kegiatan bersama dalam merawat keberagaman suku
         // Helper KOP Surat
         function dapatkanKOPHeader() {
             return dbSekolah.imgKop 
-                ? `<div class="text-center mb-4"><img src="${dbSekolah.imgKop}" class="max-h-24 mx-auto object-contain"></div>`
+                ? `<div class="text-center mb-4"><img src="${dbSekolah.imgKop}" class="kop-img max-h-24 mx-auto object-contain"></div>`
                 : `<div class="text-center border-b-2 border-slate-800 pb-2 mb-4">
-                    <h2 class="text-base font-bold uppercase tracking-wide">${escapeHtml(dbSekolah.nama)}</h2>
-                    <p class="text-[10px] text-slate-600">NPSN: ${escapeHtml(dbSekolah.npsn || '-')} | Perangkat Kurikulum Merdeka SMP Negeri</p>
+                    <h2 class="text-lg font-bold uppercase tracking-wide">${escapeHtml(dbSekolah.nama)}</h2>
+                    <p class="text-[11px] text-slate-600">NPSN: ${escapeHtml(dbSekolah.npsn || '-')} | Perangkat Kurikulum Merdeka SMP Negeri</p>
                    </div>`;
         }
 
@@ -452,14 +454,7 @@ Peserta didik mampu menginisiasi kegiatan bersama dalam merawat keberagaman suku
 
         // Fungsi Cetak & Ekspor
         function cetakArea(elemId) {
-            const content = document.getElementById(elemId).innerHTML;
-            const win = window.open('', '', 'height=600,width=800');
-            if (!win) { alert('Popup diblokir browser. Izinkan popup untuk mencetak dokumen ini.'); return; }
-            win.document.write('<html><head><title>Cetak Dokumen Perangkat Ajar</title><script src="https://cdn.tailwindcss.com"><\/script></head><body class="p-8">');
-            win.document.write(content);
-            win.document.write('</body></html>');
-            win.document.close();
-            setTimeout(() => win.print(), 500);
+            CC.printArea(elemId, 'Cetak Dokumen Perangkat Ajar');
         }
 
         function exportDoc(elemId, filename = 'Dokumen_Perangkat_Ajar') {

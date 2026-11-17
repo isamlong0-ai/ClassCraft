@@ -693,10 +693,10 @@
         // =========================================================================
         function getKopSuratHTML() {
             return profilSekolah.img_kop
-                ? `<div class="text-center mb-3"><img src="${profilSekolah.img_kop}" class="max-h-24 mx-auto object-contain"></div>`
+                ? `<div class="text-center mb-3"><img src="${profilSekolah.img_kop}" class="kop-img max-h-24 mx-auto object-contain"></div>`
                 : `<div class="text-center border-b-2 border-slate-800 pb-2 mb-3">
-                    <h2 class="text-base font-bold uppercase tracking-wide">${esc(profilSekolah.nama)}</h2>
-                    <p class="text-[10px] text-slate-600">NPSN: ${esc(profilSekolah.npsn || '-')} | Dokumen Asesmen Kurikulum Merdeka</p>
+                    <h2 class="text-lg font-bold uppercase tracking-wide">${esc(profilSekolah.nama)}</h2>
+                    <p class="text-[11px] text-slate-600">NPSN: ${esc(profilSekolah.npsn || '-')} | Dokumen Asesmen Kurikulum Merdeka</p>
                    </div>`;
         }
 
@@ -976,17 +976,7 @@
         }
 
         function cetakDokumen(elemId, judul) {
-            const content = document.getElementById(elemId).innerHTML;
-            const win = window.open('', '', 'height=680,width=920');
-            if (!win) {
-                alert('Jendela cetak diblokir browser. Izinkan popup untuk situs ini lalu coba lagi.');
-                return;
-            }
-            win.document.write(`<html><head><title>${judul}</title><script src="https://cdn.tailwindcss.com"><\/script></head><body class="p-8">`);
-            win.document.write(content);
-            win.document.write('</body></html>');
-            win.document.close();
-            setTimeout(() => win.print(), 500);
+            CC.printArea(elemId, judul);
         }
 
         async function logout() {

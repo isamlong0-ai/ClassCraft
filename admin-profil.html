@@ -42,9 +42,6 @@
                     <div>
                         <label class="block text-xs font-bold text-indigo-900 mb-1">Tahun Ajaran Aktif</label>
                         <select id="cfg-ta" class="w-full p-2 border rounded-lg text-sm bg-white font-semibold text-indigo-700">
-                            <option value="2024/2025">2024/2025</option>
-                            <option value="2025/2026">2025/2026</option>
-                            <option value="2026/2027">2026/2027</option>
                         </select>
                     </div>
                     <div>
@@ -141,13 +138,24 @@
             }
 
             document.getElementById('header-sekolah').innerText = dbSekolah.nama;
-            document.getElementById('header-ta-info').innerText = `T.A: ${dbSekolah.tahunAjaran || '2025/2026'} | Semester: ${dbSekolah.semester || 'Ganjil'}`;
+            document.getElementById('header-ta-info').innerText = `T.A: ${dbSekolah.tahunAjaran || '2026/2027'} | Semester: ${dbSekolah.semester || 'Ganjil'}`;
 
             document.getElementById('cfg-nama').value = dbSekolah.nama;
             document.getElementById('cfg-npsn').value = dbSekolah.npsn;
             document.getElementById('cfg-kepsek').value = dbSekolah.kepsek;
             document.getElementById('cfg-kepsek-nip').value = dbSekolah.nipKepsek;
-            document.getElementById('cfg-ta').value = dbSekolah.tahunAjaran || '2025/2026';
+            // Tahun ajaran: hanya tampilkan TA aktif dan TA berikutnya (hanya bertambah ke depan).
+            const taAktif = dbSekolah.tahunAjaran || '2026/2027';
+            const taBerikut = CC.tahunAjaranBerikutnya(taAktif) || taAktif;
+            const selTA = document.getElementById('cfg-ta');
+            selTA.innerHTML = '';
+            [taAktif, taBerikut].forEach((ta) => {
+                const opt = document.createElement('option');
+                opt.value = ta;
+                opt.textContent = ta;
+                selTA.appendChild(opt);
+            });
+            selTA.value = taAktif;
             document.getElementById('cfg-semester').value = dbSekolah.semester || 'Ganjil';
 
             if(dbSekolah.imgKop) {

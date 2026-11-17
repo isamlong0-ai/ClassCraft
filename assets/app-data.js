@@ -541,6 +541,41 @@
         return ringkas;
     }
 
+    // ---------- Cetak dokumen (format F4 215x330 mm) ----------
+    // Membuka jendela cetak berisi HTML dari elemen tertentu, dengan ukuran
+    // kertas F4 dan gaya kop yang proporsional. Dipakai semua modul cetak
+    // (ATP/RPP, Bank Soal, Rekap Presensi, Jurnal Mengajar).
+    function printArea(elemId, judul) {
+        var el = document.getElementById(elemId);
+        if (!el) { alert('Area cetak tidak ditemukan.'); return; }
+        var win = window.open('', '', 'height=680,width=920');
+        if (!win) {
+            alert('Jendela cetak diblokir browser. Izinkan popup untuk situs ini lalu coba lagi.');
+            return;
+        }
+        var head = [
+            '<!DOCTYPE html><html lang="id"><head><meta charset="UTF-8">',
+            '<title>' + (judul || 'Cetak Dokumen') + '</title>',
+            '<script src="https://cdn.tailwindcss.com"><\/script>',
+            '<style>',
+            '@page { size: 215mm 330mm; margin: 12mm; }',
+            'html, body { margin: 0; padding: 0; background: #fff; }',
+            'body { font-family: Arial, Helvetica, sans-serif; color: #000; }',
+            '@media screen { body { width: 191mm; margin: 0 auto; padding: 6mm 0; } }',
+            '.kop-img { width: 100%; height: auto; object-fit: contain; }',
+            'img.kop-img { width: 100%; height: auto; max-height: 32mm; object-fit: contain; }',
+            'table { border-collapse: collapse; }',
+            '</style>',
+            '</head><body>'
+        ].join('');
+        win.document.write(head);
+        win.document.write(el.innerHTML);
+        win.document.write('</body></html>');
+        win.document.close();
+        // Beri waktu Tailwind CDN memproses kelas sebelum mencetak.
+        setTimeout(function () { try { win.focus(); win.print(); } catch (e) {} }, 800);
+    }
+
     // ---------- Backup / Restore ----------
     async function exportAll() {
         var users = await getUsers();
@@ -612,6 +647,7 @@
         naikKelas: naikKelas,
         tahunAjaranBerikutnya: tahunAjaranBerikutnya,
         semesterSaatIni: semesterSaatIni,
+        printArea: printArea,
         exportAll: exportAll,
         restoreAll: restoreAll,
         defaults: { users: DEFAULT_USERS, sekolah: DEFAULT_SEKOLAH, rombel: DEFAULT_ROMBEL }

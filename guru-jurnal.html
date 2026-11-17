@@ -573,8 +573,8 @@
 
             // Header KOP
             document.getElementById('lap-kop-header').innerHTML = profilSekolah.img_kop
-                ? `<div class="text-center mb-3"><img src="${esc(profilSekolah.img_kop)}" class="max-h-24 mx-auto object-contain"></div>`
-                : `<div class="text-center border-b-2 border-slate-800 pb-2 mb-3"><h2 class="text-base font-bold uppercase">${esc(profilSekolah.nama)}</h2><p class="text-[10px]">NPSN: ${esc(profilSekolah.npsn || '-')}</p></div>`;
+                ? `<div class="text-center mb-3"><img src="${esc(profilSekolah.img_kop)}" class="kop-img max-h-24 mx-auto object-contain"></div>`
+                : `<div class="text-center border-b-2 border-slate-800 pb-2 mb-3"><h2 class="text-lg font-bold uppercase">${esc(profilSekolah.nama)}</h2><p class="text-[11px]">NPSN: ${esc(profilSekolah.npsn || '-')}</p></div>`;
 
             document.getElementById('lap-subjudul').innerText = `Periode: ${namaPeriode} | Tahun Pelajaran ${profilSekolah.tahun_ajaran}`;
 
@@ -682,17 +682,7 @@
         }
 
         function cetakLaporan() {
-            const content = document.getElementById('area-cetak-jurnal').innerHTML;
-            const win = window.open('', '', 'height=650,width=950');
-            if (!win) {
-                alert('Jendela cetak diblokir browser. Izinkan popup untuk situs ini lalu coba lagi.');
-                return;
-            }
-            win.document.write('<html><head><title>Cetak Jurnal Mengajar</title><script src="https://cdn.tailwindcss.com"><\/script></head><body class="p-8">');
-            win.document.write(content);
-            win.document.write('</body></html>');
-            win.document.close();
-            setTimeout(() => win.print(), 500);
+            CC.printArea('area-cetak-jurnal', 'Cetak Jurnal Mengajar');
         }
 
         async function logout() {
