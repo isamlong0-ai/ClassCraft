@@ -51,6 +51,12 @@
             </div>
 
             <div class="flex gap-2">
+                <button type="button" id="btn-finalisasi" onclick="finalisasiPaket()" class="hidden bg-amber-500 hover:bg-amber-600 text-white text-xs px-3 py-2 rounded-lg font-bold transition shadow">
+                    <i class="fas fa-lock mr-1"></i> Finalisasi
+                </button>
+                <button type="button" id="btn-duplikat" onclick="duplikatPaket()" class="hidden bg-slate-600 hover:bg-slate-700 text-white text-xs px-3 py-2 rounded-lg font-bold transition shadow">
+                    <i class="fas fa-copy mr-1"></i> Duplikat
+                </button>
                 <button type="button" onclick="muatContohSoal()" class="bg-amber-100 hover:bg-amber-200 text-amber-800 text-xs px-3 py-2 rounded-lg font-semibold transition">
                     <i class="fas fa-magic mr-1"></i> Isi Contoh Soal
                 </button>
@@ -75,6 +81,9 @@
                 <button onclick="switchSubTab('kunci')" id="btn-tab-kunci" class="px-4 py-2 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-indigo-600">
                     <i class="fas fa-key mr-1"></i> 4. Kunci Jawaban & Penskoran
                 </button>
+                <button onclick="switchSubTab('bank')" id="btn-tab-bank" class="px-4 py-2 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-indigo-600">
+                    <i class="fas fa-database mr-1"></i> 5. Bank Butir Soal
+                </button>
             </div>
 
             <!-- =====================================================================
@@ -82,7 +91,87 @@
             ====================================================================== -->
             <div id="panel-editor" class="p-6 space-y-6">
                 
-                <!-- Identitas Paket Asesmen -->
+                <!-- =====================================================================
+                 GENERATOR SOAL OTOMATIS DARI RPP
+            ====================================================================== -->
+            <div class="bg-indigo-50/60 p-4 rounded-xl border border-indigo-100 space-y-3 text-xs">
+                <div class="flex justify-between items-center border-b border-indigo-200 pb-1.5">
+                    <h2 class="font-bold text-indigo-800"><i class="fas fa-magic mr-1"></i> Generator Soal Otomatis (berdasarkan RPP)</h2>
+                    <span class="text-[10px] text-slate-500">Hasil berupa draf; silakan sunting sebelum dipakai.</span>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    <div>
+                        <label class="block font-semibold text-slate-700 mb-1">Sumber RPP / CP</label>
+                        <select id="gen-sumber" onchange="muatSumberGenerator()" class="w-full p-2 border rounded-lg bg-white">
+                            <option value="cp">Tempel / Unggah CP</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block font-semibold text-slate-700 mb-1">Bentuk Soal</label>
+                        <select id="gen-bentuk" class="w-full p-2 border rounded-lg bg-white">
+                            <option value="campuran">Campuran (PG + Uraian)</option>
+                            <option value="PG">Pilihan Ganda saja</option>
+                            <option value="URAIAN">Uraian saja</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block font-semibold text-slate-700 mb-1">Jumlah Soal</label>
+                        <input type="number" id="gen-jumlah" min="1" max="50" value="10" class="w-full p-2 border rounded-lg bg-white">
+                    </div>
+                </div>
+
+                <div id="gen-panel-cp" class="space-y-2">
+                    <textarea id="gen-cp" rows="4" placeholder="Tempel naskah CP di sini (atau pilih RPP tersimpan di dropdown sumber)..." class="w-full p-2.5 border rounded-lg bg-white text-xs font-mono"></textarea>
+                    <button type="button" onclick="parseCpGenerator()" class="bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs px-3 py-1.5 rounded-lg font-medium transition">
+                        <i class="fas fa-search mr-1"></i> Analisis CP
+                    </button>
+                </div>
+
+                <div id="gen-panel-rpp" class="hidden space-y-2">
+                    <div class="text-[11px] text-slate-600">Pilih elemen/TP yang akan dijadikan acuan soal:</div>
+                    <div id="gen-tp-list" class="max-h-40 overflow-y-auto border rounded-lg bg-white p-2 space-y-1"></div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    <div>
+                        <label class="block font-semibold text-slate-700 mb-1">Komposisi Kesulitan (Mudah / Menengah / Sulit)</label>
+                        <div class="flex gap-2">
+                            <input type="number" id="gen-k-mudah" min="0" value="3" class="w-full p-2 border rounded-lg bg-white" title="Mudah">
+                            <input type="number" id="gen-k-menengah" min="0" value="4" class="w-full p-2 border rounded-lg bg-white" title="Menengah">
+                            <input type="number" id="gen-k-sulit" min="0" value="3" class="w-full p-2 border rounded-lg bg-white" title="Sulit">
+                        </div>
+                        <p class="text-[10px] text-slate-500 mt-0.5">Jika total tidak sama dengan jumlah soal, akan disesuaikan otomatis.</p>
+                    </div>
+                    <div>
+                        <label class="block font-semibold text-slate-700 mb-1">Proporsi PG (jika campuran)</label>
+                        <input type="number" id="gen-prop-pg" min="0" max="100" value="60" class="w-full p-2 border rounded-lg bg-white">
+                        <p class="text-[10px] text-slate-500 mt-0.5">% PG, sisanya Uraian.</p>
+                    </div>
+                    <div class="flex items-end">
+                        <button type="button" onclick="generateSoalOtomatis()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white text-xs px-4 py-2.5 rounded-lg font-bold transition shadow">
+                            <i class="fas fa-cogs mr-1"></i> Generate Draf Soal
+                        </button>
+                    </div>
+                </div>
+
+                <div id="gen-preview-wrap" class="hidden space-y-2">
+                    <div class="flex justify-between items-center border-t pt-2">
+                        <h3 class="font-bold text-slate-800">Preview Hasil Generate (<span id="gen-preview-count">0</span> soal)</h3>
+                        <div class="flex gap-2">
+                            <button type="button" onclick="simpanHasilGenerate()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs px-3 py-1.5 rounded-lg font-bold transition">
+                                <i class="fas fa-cloud-upload-alt mr-1"></i> Simpan ke Bank & Paket
+                            </button>
+                            <button type="button" onclick="batalGenerate()" class="bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs px-3 py-1.5 rounded-lg font-medium transition">
+                                <i class="fas fa-times mr-1"></i> Batal
+                            </button>
+                        </div>
+                    </div>
+                    <div id="gen-preview" class="max-h-64 overflow-y-auto border rounded-lg bg-white p-2 text-xs space-y-2"></div>
+                </div>
+            </div>
+
+            <!-- Identitas Paket Asesmen -->
                 <div class="bg-indigo-50/60 p-4 rounded-xl border border-indigo-100 space-y-3 text-xs">
                     <h2 class="font-bold text-indigo-800 border-b border-indigo-200 pb-1.5">
                         <i class="fas fa-info-circle mr-1"></i> Identitas Dokumen Asesmen
@@ -121,6 +210,17 @@
                     </div>
                 </div>
 
+                <div class="flex flex-wrap gap-4 text-xs items-center">
+                    <label class="flex items-center gap-2 cursor-pointer">
+                        <input type="checkbox" id="meta-acak-soal" class="rounded">
+                        <span class="font-semibold text-slate-700">Acak urutan soal (Paket A/B)</span>
+                    </label>
+                    <label class="flex items-center gap-2 cursor-pointer">
+                        <input type="checkbox" id="meta-acak-opsi" class="rounded">
+                        <span class="font-semibold text-slate-700">Acak urutan opsi jawaban (PG)</span>
+                    </label>
+                </div>
+
                 <!-- Form Tambah / Edit Butir Soal -->
                 <div class="bg-slate-50 p-5 rounded-xl border border-slate-200 space-y-4 text-xs">
                     <div class="flex justify-between items-center border-b pb-2">
@@ -134,8 +234,9 @@
 
                     <form onsubmit="simpanButirSoal(event)" class="space-y-3">
                         <input type="hidden" id="edit-index-soal" value="-1">
+                        <input type="hidden" id="edit-bank-id" value="">
 
-                        <div class="grid grid-cols-1 md:grid-cols-4 gap-3">
+                        <div class="grid grid-cols-1 md:grid-cols-5 gap-3">
                             <div>
                                 <label class="block font-bold text-slate-700 mb-1">Bentuk Soal</label>
                                 <select id="soal-tipe" onchange="toggleOpsiPG()" class="w-full p-2 border rounded-lg bg-white font-semibold">
@@ -149,6 +250,14 @@
                                     <option value="L1 (LotS - Pengetahuan/Pemahaman)">L1 (LotS - C1/C2)</option>
                                     <option value="L2 (MotS - Penerapan)">L2 (MotS - C3)</option>
                                     <option value="L3 (HotS - Penalaran/Analisis)">L3 (HotS - C4/C5/C6)</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block font-bold text-slate-700 mb-1">Tingkat Kesulitan</label>
+                                <select id="soal-kesulitan" class="w-full p-2 border rounded-lg bg-white">
+                                    <option value="mudah">Mudah</option>
+                                    <option value="menengah" selected>Menengah</option>
+                                    <option value="sulit">Sulit</option>
                                 </select>
                             </div>
                             <div>
@@ -167,7 +276,14 @@
                         </div>
 
                         <div>
-                            <label class="block font-bold text-slate-700 mb-1">Naskah Pertanyaan / Stimulus Soal</label>
+                            <label class="block font-bold text-slate-700 mb-1">Stimulus / Bacaan (opsional, untuk HOTS)</label>
+                            <textarea id="soal-stimulus" rows="2" placeholder="Teks bacaan/gambaran situasi (opsional)..." class="w-full p-2.5 border rounded-lg bg-white text-xs"></textarea>
+                        </div>
+
+                        <div>
+                            <label class="block font-bold text-slate-700 mb-1">Tag (pisahkan dengan koma, opsional)</label>
+                            <input type="text" id="soal-tags" placeholder="Contoh: pancasila, bpupki, sejarah" class="w-full p-2 border rounded-lg bg-white text-xs">
+                        </div>
                             <textarea id="soal-pertanyaan" rows="3" required placeholder="Tuliskan teks pertanyaan di sini..." class="w-full p-2.5 border rounded-lg bg-white"></textarea>
                         </div>
 
@@ -275,6 +391,15 @@
                         <button onclick="cetakDokumen('area-cetak-naskah', 'Cetak Naskah Soal')" class="bg-slate-700 hover:bg-slate-800 text-white text-xs px-3 py-1.5 rounded-lg font-medium transition">
                             <i class="fas fa-print mr-1"></i> Cetak Soal
                         </button>
+                        <button onclick="cetakPaketAcak('A')" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs px-3 py-1.5 rounded-lg font-medium transition">
+                            <i class="fas fa-random mr-1"></i> Cetak Paket A
+                        </button>
+                        <button onclick="cetakPaketAcak('B')" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs px-3 py-1.5 rounded-lg font-medium transition">
+                            <i class="fas fa-random mr-1"></i> Cetak Paket B
+                        </button>
+                        <button onclick="cetakLJK()" class="bg-teal-600 hover:bg-teal-700 text-white text-xs px-3 py-1.5 rounded-lg font-medium transition">
+                            <i class="fas fa-clipboard-list mr-1"></i> Cetak LJK
+                        </button>
                     </div>
                 </div>
                 <div id="area-cetak-naskah" class="bg-white p-8 border rounded-lg text-xs space-y-4"></div>
@@ -298,6 +423,66 @@
                 <div id="area-cetak-kunci" class="bg-white p-6 border rounded-lg text-xs space-y-4"></div>
             </div>
 
+            <!-- =====================================================================
+                 SUB-TAB 5: BANK BUTIR SOAL (REUSABLE)
+            ====================================================================== -->
+            <div id="panel-bank" class="hidden p-6 space-y-4">
+                <div class="flex flex-wrap justify-between items-center gap-3 border-b pb-3">
+                    <h3 class="text-sm font-bold text-slate-800"><i class="fas fa-database mr-1 text-indigo-600"></i>Bank Butir Soal (Reusable)</h3>
+                    <div class="flex flex-wrap gap-2 items-center text-xs">
+                        <select id="bank-filter-bentuk" onchange="muatBankSoal()" class="p-2 border rounded-lg bg-white">
+                            <option value="">Semua Bentuk</option>
+                            <option value="PG">Pilihan Ganda</option>
+                            <option value="URAIAN">Uraian</option>
+                        </select>
+                        <select id="bank-filter-kesulitan" onchange="muatBankSoal()" class="p-2 border rounded-lg bg-white">
+                            <option value="">Semua Kesulitan</option>
+                            <option value="mudah">Mudah</option>
+                            <option value="menengah">Menengah</option>
+                            <option value="sulit">Sulit</option>
+                        </select>
+                        <select id="bank-filter-status" onchange="muatBankSoal()" class="p-2 border rounded-lg bg-white">
+                            <option value="">Semua Status</option>
+                            <option value="draft">Draft</option>
+                            <option value="validasi">Tervalidasi</option>
+                        </select>
+                        <select id="bank-filter-arsip" onchange="muatBankSoal()" class="p-2 border rounded-lg bg-white" title="Filter Tahun Ajaran / Semester">
+                            <option value="">T.A. & Semester Aktif</option>
+                        </select>
+                        <input type="text" id="bank-filter-q" oninput="muatBankSoal()" placeholder="Cari pertanyaan/TP..." class="p-2 border rounded-lg bg-white w-44">
+                        <button type="button" onclick="eksporBankSoalCSV()" class="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-2 rounded-lg font-bold transition">
+                            <i class="fas fa-file-csv mr-1"></i> Ekspor CSV
+                        </button>
+                        <label class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-lg font-bold transition cursor-pointer">
+                            <i class="fas fa-file-import mr-1"></i> Import CSV
+                            <input type="file" accept=".csv" class="hidden" onchange="imporBankSoalCSV(this)">
+                        </label>
+                        <button type="button" onclick="tambahTerpilihKePaket()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-2 rounded-lg font-bold transition">
+                            <i class="fas fa-plus mr-1"></i> Tambahkan Terpilih ke Paket
+                        </button>
+                    </div>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse text-xs">
+                        <thead>
+                            <tr class="bg-slate-100 text-slate-700 border-b">
+                                <th class="p-2.5 w-10 text-center"><input type="checkbox" id="bank-check-all" onclick="toggleCheckAllBank(this.checked)"></th>
+                                <th class="p-2.5 w-12 text-center">No</th>
+                                <th class="p-2.5 w-20">Bentuk</th>
+                                <th class="p-2.5 w-24">Kesulitan</th>
+                                <th class="p-2.5">TP / Pertanyaan</th>
+                                <th class="p-2.5 w-20 text-center">Status</th>
+                                <th class="p-2.5 w-20 text-center">Dipakai</th>
+                                <th class="p-2.5 w-24 text-center">Aksi</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tbody-bank-soal">
+                            <tr><td colspan="8" class="text-center p-6 text-slate-400">Memuat bank soal...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
         </div>
 
     </main>
@@ -314,6 +499,12 @@
         let arsipPaket = [];
         let activePaketId = null;
         let daftarSoal = [];
+        let bankSoal = [];
+        let bankUsage = {};
+        let selectedBankIds = new Set();
+        let arsipRppSoal = [];
+        let genTPs = [];
+        let genPreview = [];
 
         function esc(str) {
             return String(str || '')
@@ -367,6 +558,9 @@
 
             // 3. Muat Arsip Paket Soal Guru
             await muatArsipPaket();
+            // 4. Muat Arsip RPP (sumber generator)
+            await muatArsipRppSoal();
+            isiDropdownSumberGenerator();
         });
 
         async function muatArsipPaket() {
@@ -392,7 +586,7 @@
             }
         }
 
-        function pilihArsipPaket(paketId) {
+        async function pilihArsipPaket(paketId) {
             if (!paketId) {
                 buatPaketBaru();
                 return;
@@ -408,6 +602,25 @@
             document.getElementById('meta-mapel').value = paket.mapel || profilGuru.mapel || '';
 
             daftarSoal = Array.isArray(paket.daftar_soal) ? JSON.parse(JSON.stringify(paket.daftar_soal)) : [];
+            // Untuk paket draft, sinkronkan butir dari bank (referensi hidup); final pakai snapshot.
+            if (paket.status !== 'final' && CC.isConfigured()) {
+                const ids = daftarSoal.map(s => s.butir_id).filter(Boolean);
+                if (ids.length) {
+                    const { data } = await CC.client.from('bank_soal').select('*').in('id', ids);
+                    const map = {};
+                    (data || []).forEach(b => { map[b.id] = b; });
+                    daftarSoal = daftarSoal.map(s => s.butir_id && map[s.butir_id] ? bankItemToSoal(map[s.butir_id]) : s);
+                }
+            } else if (paket.status === 'final' && Array.isArray(paket.snapshot) && paket.snapshot.length) {
+                daftarSoal = JSON.parse(JSON.stringify(paket.snapshot));
+            }
+            document.getElementById('btn-hapus-paket').classList.remove('hidden');
+            if (paket.status === 'final') {
+                document.getElementById('btn-finalisasi').classList.add('hidden');
+            } else {
+                document.getElementById('btn-finalisasi').classList.remove('hidden');
+            }
+            document.getElementById('btn-duplikat').classList.remove('hidden');
             document.getElementById('btn-hapus-paket').classList.remove('hidden');
             resetFormButir();
             renderDaftarSoal();
@@ -424,6 +637,8 @@
             document.getElementById('meta-mapel').value = profilGuru.mapel || '';
             daftarSoal = [];
             document.getElementById('btn-hapus-paket').classList.add('hidden');
+            document.getElementById('btn-finalisasi').classList.add('hidden');
+            document.getElementById('btn-duplikat').classList.add('hidden');
             resetFormButir();
             renderDaftarSoal();
             renderSemuaDokumen();
@@ -448,6 +663,8 @@
                 mapel: document.getElementById('meta-mapel').value.trim(),
                 tanggal_ujian: document.getElementById('meta-tanggal').value,
                 alokasi_waktu: document.getElementById('meta-waktu').value.trim(),
+                acak_soal: document.getElementById('meta-acak-soal').checked,
+                acak_opsi: document.getElementById('meta-acak-opsi').checked,
                 daftar_soal: daftarSoal,
                 updated_at: new Date().toISOString()
             };
@@ -467,6 +684,16 @@
             } else {
                 activePaketId = res.data.id;
                 document.getElementById('btn-hapus-paket').classList.remove('hidden');
+                // Sinkronkan pivot paket_soal_butir
+                if (CC.isConfigured()) {
+                    await CC.client.from('paket_soal_butir').delete().eq('paket_id', activePaketId);
+                    const rows = daftarSoal
+                        .map((s, i) => s.butir_id ? { paket_id: activePaketId, butir_id: s.butir_id, urutan: i, skor_override: null } : null)
+                        .filter(Boolean);
+                    if (rows.length) {
+                        await CC.client.from('paket_soal_butir').insert(rows);
+                    }
+                }
                 await muatArsipPaket();
                 alert('Paket soal, kisi-kisi, dan kunci jawaban berhasil tersimpan di Supabase!');
             }
@@ -503,7 +730,7 @@
             }
         }
 
-        function simpanButirSoal(e) {
+        async function simpanButirSoal(e) {
             e.preventDefault();
             const tipe = document.getElementById('soal-tipe').value;
             const editIdx = parseInt(document.getElementById('edit-index-soal').value, 10);
@@ -522,9 +749,12 @@
             const item = {
                 tipe: tipe,
                 level: document.getElementById('soal-level').value,
+                kesulitan: document.getElementById('soal-kesulitan').value,
                 skor: parseInt(document.getElementById('soal-skor').value, 10) || 1,
                 tp_materi: document.getElementById('soal-tp').value.trim(),
                 indikator: document.getElementById('soal-indikator').value.trim(),
+                stimulus: document.getElementById('soal-stimulus').value.trim(),
+                tags: document.getElementById('soal-tags').value.split(',').map(t => t.trim()).filter(Boolean),
                 pertanyaan: document.getElementById('soal-pertanyaan').value.trim(),
                 opsi_a: tipe === 'PG' ? document.getElementById('soal-opsi-a').value.trim() : '',
                 opsi_b: tipe === 'PG' ? document.getElementById('soal-opsi-b').value.trim() : '',
@@ -535,7 +765,70 @@
                     : (document.getElementById('soal-kunci-uraian').value.trim() || 'Kebijaksanaan guru sesuai rubrik.')
             };
 
-            if (editIdx >= 0 && editIdx < daftarSoal.length) {
+            const editBankId = document.getElementById('edit-bank-id').value.trim();
+
+            // Simpan ke bank_soal (master) bila terhubung ke Supabase
+            let butirId = null;
+            if (CC.isConfigured()) {
+                const bankPayload = {
+                    guru_id: profilGuru.id,
+                    mapel: document.getElementById('meta-mapel').value.trim() || profilGuru.mapel || '',
+                    tingkat: document.getElementById('meta-tingkat').value,
+                    elemen: '',
+                    tp: item.tp_materi,
+                    indikator: item.indikator,
+                    bentuk: item.tipe,
+                    level_kognitif: item.level,
+                    tingkat_kesulitan: item.kesulitan || 'menengah',
+                    stimulus: item.stimulus || '',
+                    pertanyaan: item.pertanyaan,
+                    opsi_a: item.opsi_a, opsi_b: item.opsi_b, opsi_c: item.opsi_c, opsi_d: item.opsi_d,
+                    kunci: item.kunci,
+                    skor: item.skor,
+                    tags: item.tags || [],
+                    sumber: 'manual',
+                    tahun_ajaran: profilSekolah.tahun_ajaran,
+                    semester: profilSekolah.semester,
+                    updated_at: new Date().toISOString()
+                };
+
+                if (editBankId) {
+                    const { data: cur } = await CC.client.from('bank_soal').select('*').eq('id', editBankId).single();
+                    if (cur) {
+                        const snap = Object.assign({}, cur);
+                        delete snap.riwayat;
+                        bankPayload.riwayat = [snap, ...(cur.riwayat || [])].slice(0, 20);
+                        bankPayload.versi = (cur.versi || 1) + 1;
+                    }
+                    const { data, error } = await CC.client.from('bank_soal').update(bankPayload).eq('id', editBankId).select().single();
+                    if (error) { alert('Gagal memperbarui bank soal: ' + error.message); return; }
+                    butirId = editBankId;
+                } else if (editIdx >= 0 && daftarSoal[editIdx] && daftarSoal[editIdx].butir_id) {
+                    const bid = daftarSoal[editIdx].butir_id;
+                    const { data: cur } = await CC.client.from('bank_soal').select('*').eq('id', bid).single();
+                    if (cur) {
+                        const snap = Object.assign({}, cur);
+                        delete snap.riwayat;
+                        bankPayload.riwayat = [snap, ...(cur.riwayat || [])].slice(0, 20);
+                        bankPayload.versi = (cur.versi || 1) + 1;
+                    }
+                    const { data, error } = await CC.client.from('bank_soal').update(bankPayload).eq('id', bid).select().single();
+                    if (error) { alert('Gagal memperbarui bank soal: ' + error.message); return; }
+                    butirId = bid;
+                } else {
+                    const { data, error } = await CC.client.from('bank_soal').insert([bankPayload]).select().single();
+                    if (error) { alert('Gagal menyimpan ke bank soal: ' + error.message); return; }
+                    butirId = data.id;
+                }
+            }
+
+            item.butir_id = butirId;
+
+            if (editBankId) {
+                const idxInPaket = daftarSoal.findIndex(s => s.butir_id === editBankId);
+                if (idxInPaket >= 0) daftarSoal[idxInPaket] = item;
+                document.getElementById('edit-bank-id').value = '';
+            } else if (editIdx >= 0 && editIdx < daftarSoal.length) {
                 daftarSoal[editIdx] = item;
             } else {
                 daftarSoal.push(item);
@@ -544,6 +837,7 @@
             resetFormButir();
             renderDaftarSoal();
             renderSemuaDokumen();
+            await muatBankSoal();
         }
 
         function editButirSoal(idx) {
@@ -555,9 +849,12 @@
             toggleOpsiPG();
 
             document.getElementById('soal-level').value = s.level;
+            document.getElementById('soal-kesulitan').value = s.kesulitan || 'menengah';
             document.getElementById('soal-skor').value = s.skor;
             document.getElementById('soal-tp').value = s.tp_materi;
             document.getElementById('soal-indikator').value = s.indikator;
+            document.getElementById('soal-stimulus').value = s.stimulus || '';
+            document.getElementById('soal-tags').value = Array.isArray(s.tags) ? s.tags.join(', ') : '';
             document.getElementById('soal-pertanyaan').value = s.pertanyaan;
 
             if (s.tipe === 'PG') {
@@ -578,8 +875,11 @@
 
         function resetFormButir() {
             document.getElementById('edit-index-soal').value = '-1';
+            document.getElementById('edit-bank-id').value = '';
             document.getElementById('soal-pertanyaan').value = '';
             document.getElementById('soal-indikator').value = '';
+            document.getElementById('soal-stimulus').value = '';
+            document.getElementById('soal-tags').value = '';
             document.getElementById('soal-opsi-a').value = '';
             document.getElementById('soal-opsi-b').value = '';
             document.getElementById('soal-opsi-c').value = '';
@@ -604,6 +904,7 @@
                 {
                     tipe: 'PG',
                     level: 'L1 (LotS - Pengetahuan/Pemahaman)',
+                    kesulitan: 'mudah',
                     skor: 2,
                     tp_materi: `TP 1.1 Sejarah & Perumusan Dasar Negara (${mapel})`,
                     indikator: 'Peserta didik dapat mengidentifikasi tanggal pembentukan Badan Penyelidik Usaha-usaha Persiapan Kemerdekaan Indonesia (BPUPKI).',
@@ -617,6 +918,7 @@
                 {
                     tipe: 'PG',
                     level: 'L2 (MotS - Penerapan)',
+                    kesulitan: 'menengah',
                     skor: 2,
                     tp_materi: 'TP 1.2 Penerapan Nilai Pancasila dalam Kehidupan',
                     indikator: 'Disajikan ilustrasi musyawarah kelas, peserta didik dapat menentukan sila Pancasila yang tercermin dalam perilaku tersebut.',
@@ -630,6 +932,7 @@
                 {
                     tipe: 'URAIAN',
                     level: 'L3 (HotS - Penalaran/Analisis)',
+                    kesulitan: 'sulit',
                     skor: 6,
                     tp_materi: 'TP 1.3 Semangat Komitmen Pendiri Negara',
                     indikator: 'Peserta didik dapat menganalisis dua bentuk teladan komitmen kebangsaan para perumus Pancasila yang relevan diterapkan di lingkungan sekolah.',
@@ -660,13 +963,14 @@
                     ? `<span class="bg-indigo-100 text-indigo-700 font-bold px-2 py-0.5 rounded text-[10px]">Pilihan Ganda</span>`
                     : `<span class="bg-purple-100 text-purple-700 font-bold px-2 py-0.5 rounded text-[10px]">Uraian</span>`;
 
+                const badgeKes = `<span class="bg-amber-100 text-amber-700 font-bold px-2 py-0.5 rounded text-[10px]">${esc(s.kesulitan || 'menengah')}</span>`;
                 const ringkasKunci = s.tipe === 'PG' ? `Kunci: <b>${esc(s.kunci)}</b>` : `Rubrik Uraian`;
 
                 tbody.innerHTML += `
                     <tr class="hover:bg-slate-50 align-top">
                         <td class="p-2.5 text-center font-bold">${idx + 1}</td>
                         <td class="p-2.5">${badgeTipe}</td>
-                        <td class="p-2.5 text-[11px] font-semibold text-slate-600">${esc(String(s.level || '').split(' ')[0])}</td>
+                        <td class="p-2.5 text-[11px] font-semibold text-slate-600">${esc(String(s.level || '').split(' ')[0])}<br>${badgeKes}</td>
                         <td class="p-2.5">
                             <div class="text-[11px] text-indigo-700 font-semibold">${esc(s.tp_materi)}</div>
                             <div class="text-slate-800 mt-0.5">${esc(s.pertanyaan)}</div>
@@ -722,71 +1026,34 @@
             `;
         }
 
-        function renderSemuaDokumen() {
+        function bangunNaskahHTML(soalList, acakOpsi) {
             const jenis = document.getElementById('meta-jenis').value;
             const tingkat = document.getElementById('meta-tingkat').value;
-            const mapel = document.getElementById('meta-mapel').value.trim() || '-';
+            const mapel = document.getElementById('meta-mapel').value.trim() || profilGuru.mapel || '-';
             const tanggal = document.getElementById('meta-tanggal').value || '-';
             const waktu = document.getElementById('meta-waktu').value.trim() || '90 Menit';
 
-            const soalPG = daftarSoal.filter(s => s.tipe === 'PG');
-            const soalUraian = daftarSoal.filter(s => s.tipe === 'URAIAN');
-            const totalSkor = daftarSoal.reduce((acc, s) => acc + (Number(s.skor) || 0), 0);
-
-            // 1. RENDER KISI-KISI SOAL
-            let rowsKisi = '';
-            let noUrut = 1;
-            [...soalPG, ...soalUraian].forEach((s, i) => {
-                const bentuk = s.tipe === 'PG' ? 'Pilihan Ganda' : 'Uraian';
-                rowsKisi += `
-                    <tr class="align-top">
-                        <td class="p-2 border border-slate-400 text-center">${i + 1}</td>
-                        <td class="p-2 border border-slate-400">${esc(s.tp_materi)}</td>
-                        <td class="p-2 border border-slate-400">${esc(s.indikator)}</td>
-                        <td class="p-2 border border-slate-400 text-center font-semibold">${esc(String(s.level || '').split(' ')[0])}</td>
-                        <td class="p-2 border border-slate-400 text-center">${bentuk}</td>
-                        <td class="p-2 border border-slate-400 text-center font-bold">${noUrut++}</td>
-                        <td class="p-2 border border-slate-400 text-center">${s.skor}</td>
-                    </tr>
-                `;
+            // Persiapkan soal PG & Uraian (dengan opsi acak bila diminta)
+            const list = (soalList || []).map(s => {
+                const item = Object.assign({}, s);
+                if (acakOpsi && item.tipe === 'PG') {
+                    const pairs = [
+                        { key: 'A', val: item.opsi_a }, { key: 'B', val: item.opsi_b },
+                        { key: 'C', val: item.opsi_c }, { key: 'D', val: item.opsi_d }
+                    ].sort(() => Math.random() - 0.5);
+                    const kunciAsli = item.kunci;
+                    // cari value kunci asli
+                    const mapKeyToVal = { A: item.opsi_a, B: item.opsi_b, C: item.opsi_c, D: item.opsi_d };
+                    const kunciVal = mapKeyToVal[kunciAsli] || '';
+                    item.opsi_a = pairs[0].val; item.opsi_b = pairs[1].val; item.opsi_c = pairs[2].val; item.opsi_d = pairs[3].val;
+                    const newKey = pairs.findIndex(p => p.val === kunciVal && p.val !== '');
+                    item.kunci = newKey >= 0 ? ['A','B','C','D'][newKey] : kunciAsli;
+                }
+                return item;
             });
+            const soalPG = list.filter(s => s.tipe === 'PG');
+            const soalUraian = list.filter(s => s.tipe === 'URAIAN');
 
-            document.getElementById('area-cetak-kisikisi').innerHTML = `
-                ${getKopSuratHTML()}
-                <div class="text-center font-bold mb-3">
-                    <h3 class="text-sm uppercase">KISI-KISI PENULISAN SOAL ${esc(jenis)}</h3>
-                    <p class="text-xs font-normal">Tahun Pelajaran ${esc(profilSekolah.tahun_ajaran)} | Semester ${esc(profilSekolah.semester)}</p>
-                </div>
-                <table class="w-full text-xs mb-3">
-                    <tr>
-                        <td class="w-36 font-semibold py-0.5">Satuan Pendidikan</td><td class="w-3">:</td><td>${esc(profilSekolah.nama)}</td>
-                        <td class="w-32 font-semibold py-0.5">Kelas / Fase</td><td class="w-3">:</td><td>${esc(tingkat)} / Fase D</td>
-                    </tr>
-                    <tr>
-                        <td class="font-semibold py-0.5">Mata Pelajaran</td><td>:</td><td>${esc(mapel)}</td>
-                        <td class="font-semibold py-0.5">Jumlah Soal</td><td>:</td><td>${soalPG.length} PG, ${soalUraian.length} Uraian</td>
-                    </tr>
-                </table>
-                <table class="w-full text-left border-collapse border border-slate-400 text-xs">
-                    <thead>
-                        <tr class="bg-slate-100">
-                            <th class="p-2 border border-slate-400 text-center w-10">No</th>
-                            <th class="p-2 border border-slate-400 w-1/4">Tujuan Pembelajaran / Materi</th>
-                            <th class="p-2 border border-slate-400">Indikator Soal</th>
-                            <th class="p-2 border border-slate-400 text-center w-16">Level</th>
-                            <th class="p-2 border border-slate-400 text-center w-24">Bentuk Soal</th>
-                            <th class="p-2 border border-slate-400 text-center w-16">No. Soal</th>
-                            <th class="p-2 border border-slate-400 text-center w-14">Skor</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${rowsKisi || `<tr><td colspan="7" class="p-4 border border-slate-400 text-center text-slate-400">Belum ada butir soal.</td></tr>`}
-                    </tbody>
-                </table>
-                ${getBlokTTDHTML()}
-            `;
-
-            // 2. RENDER NASKAH SOAL UJIAN
             let htmlPG = '';
             soalPG.forEach((s, idx) => {
                 htmlPG += `
@@ -815,14 +1082,13 @@
                 `;
             });
 
-            document.getElementById('area-cetak-naskah').innerHTML = `
+            return `
                 ${getKopSuratHTML()}
                 <div class="text-center font-bold border-b border-slate-800 pb-2 mb-3">
                     <h3 class="text-sm uppercase">${esc(jenis)}</h3>
                     <p class="text-xs font-semibold">TAHUN PELAJARAN ${esc(profilSekolah.tahun_ajaran)} (SEMESTER ${esc(profilSekolah.semester).toUpperCase()})</p>
                 </div>
 
-                <!-- Kotak Identitas Ujian & Peserta Didik -->
                 <table class="w-full text-xs border-collapse border border-slate-800 mb-3">
                     <tr>
                         <td class="p-1.5 border border-slate-800 font-semibold w-32">Mata Pelajaran</td>
@@ -862,8 +1128,81 @@
                     </div>
                 ` : ''}
 
-                ${daftarSoal.length === 0 ? `<p class="text-center text-slate-400 py-6">Belum ada butir soal dalam paket ini.</p>` : ''}
+                ${list.length === 0 ? `<p class="text-center text-slate-400 py-6">Belum ada butir soal dalam paket ini.</p>` : ''}
             `;
+        }
+
+        function renderSemuaDokumen() {
+            const jenis = document.getElementById('meta-jenis').value;
+            const tingkat = document.getElementById('meta-tingkat').value;
+            const mapel = document.getElementById('meta-mapel').value.trim() || '-';
+            const tanggal = document.getElementById('meta-tanggal').value || '-';
+            const waktu = document.getElementById('meta-waktu').value.trim() || '90 Menit';
+
+            const soalPG = daftarSoal.filter(s => s.tipe === 'PG');
+            const soalUraian = daftarSoal.filter(s => s.tipe === 'URAIAN');
+            const totalSkor = daftarSoal.reduce((acc, s) => acc + (Number(s.skor) || 0), 0);
+
+            // 1. RENDER KISI-KISI SOAL
+            let rowsKisi = '';
+            let noUrut = 1;
+            [...soalPG, ...soalUraian].forEach((s, i) => {
+                const bentuk = s.tipe === 'PG' ? 'Pilihan Ganda' : 'Uraian';
+                rowsKisi += `
+                    <tr class="align-top">
+                        <td class="p-2 border border-slate-400 text-center">${i + 1}</td>
+                        <td class="p-2 border border-slate-400">${esc(s.tp_materi)}</td>
+                        <td class="p-2 border border-slate-400">${esc(s.indikator)}</td>
+                        <td class="p-2 border border-slate-400 text-center font-semibold">${esc(String(s.level || '').split(' ')[0])}</td>
+                        <td class="p-2 border border-slate-400 text-center">${esc(s.kesulitan || 'menengah')}</td>
+                        <td class="p-2 border border-slate-400 text-center">${bentuk}</td>
+                        <td class="p-2 border border-slate-400 text-center font-bold">${noUrut++}</td>
+                        <td class="p-2 border border-slate-400 text-center">${s.skor}</td>
+                    </tr>
+                `;
+            });
+
+            document.getElementById('area-cetak-kisikisi').innerHTML = `
+                ${getKopSuratHTML()}
+                <div class="text-center font-bold mb-3">
+                    <h3 class="text-sm uppercase">KISI-KISI PENULISAN SOAL ${esc(jenis)}</h3>
+                    <p class="text-xs font-normal">Tahun Pelajaran ${esc(profilSekolah.tahun_ajaran)} | Semester ${esc(profilSekolah.semester)}</p>
+                </div>
+                <table class="w-full text-xs mb-3">
+                    <tr>
+                        <td class="w-36 font-semibold py-0.5">Satuan Pendidikan</td><td class="w-3">:</td><td>${esc(profilSekolah.nama)}</td>
+                        <td class="w-32 font-semibold py-0.5">Kelas / Fase</td><td class="w-3">:</td><td>${esc(tingkat)} / Fase D</td>
+                    </tr>
+                    <tr>
+                        <td class="font-semibold py-0.5">Mata Pelajaran</td><td>:</td><td>${esc(mapel)}</td>
+                        <td class="font-semibold py-0.5">Jumlah Soal</td><td>:</td><td>${soalPG.length} PG, ${soalUraian.length} Uraian (Total ${daftarSoal.length})</td>
+                    </tr>
+                    <tr>
+                        <td class="font-semibold py-0.5">Komposisi Kesulitan</td><td>:</td><td>Mudah: ${daftarSoal.filter(s=>s.kesulitan==='mudah').length}, Menengah: ${daftarSoal.filter(s=>s.kesulitan==='menengah').length}, Sulit: ${daftarSoal.filter(s=>s.kesulitan==='sulit').length}</td>
+                    </tr>
+                </table>
+                <table class="w-full text-left border-collapse border border-slate-400 text-xs">
+                    <thead>
+                        <tr class="bg-slate-100">
+                            <th class="p-2 border border-slate-400 text-center w-10">No</th>
+                            <th class="p-2 border border-slate-400 w-1/4">Tujuan Pembelajaran / Materi</th>
+                            <th class="p-2 border border-slate-400">Indikator Soal</th>
+                            <th class="p-2 border border-slate-400 text-center w-16">Level</th>
+                            <th class="p-2 border border-slate-400 text-center w-20">Kesulitan</th>
+                            <th class="p-2 border border-slate-400 text-center w-24">Bentuk Soal</th>
+                            <th class="p-2 border border-slate-400 text-center w-16">No. Soal</th>
+                            <th class="p-2 border border-slate-400 text-center w-14">Skor</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${rowsKisi || `<tr><td colspan="8" class="p-4 border border-slate-400 text-center text-slate-400">Belum ada butir soal.</td></tr>`}
+                    </tbody>
+                </table>
+                ${getBlokTTDHTML()}
+            `;
+
+            // 2. RENDER NASKAH SOAL UJIAN
+            document.getElementById('area-cetak-naskah').innerHTML = bangunNaskahHTML(daftarSoal, document.getElementById('meta-acak-opsi').checked);
 
             // 3. RENDER KUNCI JAWABAN & PEDOMAN PENSKORAN
             let rowsKunciPG = '';
@@ -937,10 +1276,11 @@
         }
 
         function switchSubTab(tab) {
-            const tabs = ['editor', 'kisikisi', 'naskah', 'kunci'];
+            const tabs = ['editor', 'kisikisi', 'naskah', 'kunci', 'bank'];
             tabs.forEach(t => {
                 const btn = document.getElementById(`btn-tab-${t}`);
                 const panel = document.getElementById(`panel-${t}`);
+                if (!btn || !panel) return;
                 if (t === tab) {
                     btn.className = 'px-4 py-2 text-xs font-bold border-b-2 border-indigo-600 text-indigo-700 bg-white rounded-t-lg';
                     panel.classList.remove('hidden');
@@ -951,6 +1291,9 @@
             });
             if (tab !== 'editor') {
                 renderSemuaDokumen();
+            }
+            if (tab === 'bank') {
+                muatBankSoal();
             }
         }
 
@@ -964,6 +1307,685 @@
 
         function cetakDokumen(elemId, judul) {
             CC.printArea(elemId, judul);
+        }
+
+        async function muatBankSoal() {
+            if (!CC.isConfigured()) {
+                document.getElementById('tbody-bank-soal').innerHTML = `<tr><td colspan="8" class="text-center p-6 text-slate-400">Bank soal memerlukan koneksi database.</td></tr>`;
+                return;
+            }
+            const bentuk = document.getElementById('bank-filter-bentuk').value;
+            const kes = document.getElementById('bank-filter-kesulitan').value;
+            const status = document.getElementById('bank-filter-status').value;
+            const q = (document.getElementById('bank-filter-q').value || '').trim().toLowerCase();
+
+            const arsipSel = document.getElementById('bank-filter-arsip');
+            if (arsipSel.options.length <= 1) {
+                const { data: all } = await CC.client.from('bank_soal').select('tahun_ajaran,semester').eq('guru_id', profilGuru.id);
+                const seen = new Set();
+                (all || []).forEach(r => {
+                    const key = r.tahun_ajaran + '|' + r.semester;
+                    if (seen.has(key)) return;
+                    seen.add(key);
+                    const opt = document.createElement('option');
+                    opt.value = key;
+                    opt.textContent = `${r.tahun_ajaran} - ${r.semester}`;
+                    if (r.tahun_ajaran === profilSekolah.tahun_ajaran && r.semester === profilSekolah.semester) opt.textContent += ' (aktif)';
+                    arsipSel.appendChild(opt);
+                });
+            }
+            const arsip = arsipSel.value;
+            let ta = profilSekolah.tahun_ajaran;
+            let sem = profilSekolah.semester;
+            if (arsip) { const parts = arsip.split('|'); ta = parts[0]; sem = parts[1]; }
+
+            let query = CC.client.from('bank_soal').select('*')
+                .eq('guru_id', profilGuru.id)
+                .eq('tahun_ajaran', ta)
+                .eq('semester', sem)
+                .order('created_at', { ascending: false });
+            if (bentuk) query = query.eq('bentuk', bentuk);
+            if (kes) query = query.eq('tingkat_kesulitan', kes);
+            if (status) query = query.eq('status', status);
+
+            const { data, error } = await query;
+            if (error) { console.error('Gagal memuat bank soal:', error); return; }
+            let items = data || [];
+            if (q) items = items.filter(b => (b.pertanyaan || '').toLowerCase().includes(q) || (b.tp || '').toLowerCase().includes(q) || (b.indikator || '').toLowerCase().includes(q));
+
+            // usage counts
+            const ids = items.map(b => b.id);
+            bankUsage = {};
+            if (ids.length) {
+                const { data: piv } = await CC.client.from('paket_soal_butir').select('butir_id').in('butir_id', ids);
+                (piv || []).forEach(p => { bankUsage[p.butir_id] = (bankUsage[p.butir_id] || 0) + 1; });
+            }
+
+            bankSoal = items;
+            renderBankTable();
+        }
+
+        function renderBankTable() {
+            const tbody = document.getElementById('tbody-bank-soal');
+            if (!bankSoal.length) {
+                tbody.innerHTML = `<tr><td colspan="8" class="text-center p-6 text-slate-400">Belum ada butir soal di bank. Tambahkan melalui form "Penyusunan Butir Soal".</td></tr>`;
+                return;
+            }
+            tbody.innerHTML = '';
+            bankSoal.forEach((b, idx) => {
+                const badgeBentuk = b.bentuk === 'PG'
+                    ? `<span class="bg-indigo-100 text-indigo-700 font-bold px-2 py-0.5 rounded text-[10px]">PG</span>`
+                    : `<span class="bg-purple-100 text-purple-700 font-bold px-2 py-0.5 rounded text-[10px]">Uraian</span>`;
+                const kes = b.tingkat_kesulitan || 'menengah';
+                const kesColor = kes === 'mudah' ? 'bg-emerald-100 text-emerald-700' : kes === 'sulit' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700';
+                const statusBadge = b.status === 'validasi'
+                    ? `<span class="bg-emerald-100 text-emerald-700 font-bold px-2 py-0.5 rounded text-[10px]">Valid</span>`
+                    : `<span class="bg-slate-200 text-slate-600 font-bold px-2 py-0.5 rounded text-[10px]">Draft</span>`;
+                const used = bankUsage[b.id] || 0;
+                tbody.innerHTML += `
+                    <tr class="hover:bg-slate-50 align-top">
+                        <td class="p-2.5 text-center"><input type="checkbox" class="bank-check" value="${esc(b.id)}" onchange="syncSelectedBank()"></td>
+                        <td class="p-2.5 text-center font-bold">${idx + 1}</td>
+                        <td class="p-2.5">${badgeBentuk}</td>
+                        <td class="p-2.5"><span class="${kesColor} font-bold px-2 py-0.5 rounded text-[10px]">${esc(kes)}</span></td>
+                        <td class="p-2.5">
+                            <div class="text-[11px] text-indigo-700 font-semibold">${esc(b.tp || '-')}</div>
+                            <div class="text-slate-800 mt-0.5">${esc((b.pertanyaan || '').slice(0, 120))}${(b.pertanyaan || '').length > 120 ? '...' : ''}</div>
+                        </td>
+                        <td class="p-2.5 text-center">${statusBadge}</td>
+                        <td class="p-2.5 text-center font-bold ${used > 0 ? 'text-indigo-700' : 'text-slate-400'}">${used}</td>
+                        <td class="p-2.5 text-center space-x-1">
+                            <button onclick="editBankButir('${esc(b.id)}')" title="Edit" class="bg-amber-500 hover:bg-amber-600 text-white px-2 py-1 rounded text-[10px]"><i class="fas fa-edit"></i></button>
+                            <button onclick="toggleStatusBank('${esc(b.id)}')" title="Ubah status" class="bg-slate-500 hover:bg-slate-600 text-white px-2 py-1 rounded text-[10px]"><i class="fas fa-toggle-on"></i></button>
+                            <button onclick="lihatRiwayat('${esc(b.id)}')" title="Riwayat versi" class="bg-blue-500 hover:bg-blue-600 text-white px-2 py-1 rounded text-[10px]"><i class="fas fa-history"></i></button>
+                            <button onclick="hapusBankButir('${esc(b.id)}')" title="Hapus" class="bg-red-500 hover:bg-red-600 text-white px-2 py-1 rounded text-[10px]"><i class="fas fa-trash"></i></button>
+                        </td>
+                    </tr>
+                `;
+            });
+        }
+
+        function syncSelectedBank() {
+            selectedBankIds = new Set(Array.from(document.querySelectorAll('.bank-check:checked')).map(c => c.value));
+        }
+
+        function toggleCheckAllBank(checked) {
+            document.querySelectorAll('.bank-check').forEach(c => { c.checked = checked; });
+            syncSelectedBank();
+        }
+
+        async function tambahTerpilihKePaket() {
+            syncSelectedBank();
+            if (selectedBankIds.size === 0) { alert('Pilih minimal 1 butir soal dari bank.'); return; }
+            const chosen = bankSoal.filter(b => selectedBankIds.has(b.id));
+            let added = 0;
+            chosen.forEach(b => {
+                if (daftarSoal.some(s => s.butir_id === b.id)) return; // skip duplikat
+                daftarSoal.push(bankItemToSoal(b));
+                added++;
+            });
+            selectedBankIds.clear();
+            document.querySelectorAll('.bank-check').forEach(c => c.checked = false);
+            document.getElementById('bank-check-all').checked = false;
+            renderDaftarSoal();
+            renderSemuaDokumen();
+            alert(added + ' butir soal ditambahkan ke paket aktif.');
+        }
+
+        function bankItemToSoal(b) {
+            return {
+                butir_id: b.id,
+                tipe: b.bentuk,
+                level: b.level_kognitif,
+                kesulitan: b.tingkat_kesulitan,
+                skor: b.skor,
+                tp_materi: b.tp || '',
+                indikator: b.indikator || '',
+                stimulus: b.stimulus || '',
+                tags: Array.isArray(b.tags) ? b.tags : [],
+                pertanyaan: b.pertanyaan || '',
+                opsi_a: b.opsi_a || '', opsi_b: b.opsi_b || '', opsi_c: b.opsi_c || '', opsi_d: b.opsi_d || '',
+                kunci: b.kunci || ''
+            };
+        }
+
+        function editBankButir(id) {
+            const b = bankSoal.find(x => x.id === id);
+            if (!b) return;
+            // load into form
+            document.getElementById('edit-bank-id').value = b.id;
+            document.getElementById('edit-index-soal').value = '-1';
+            document.getElementById('soal-tipe').value = b.bentuk;
+            toggleOpsiPG();
+            document.getElementById('soal-level').value = b.level_kognitif;
+            document.getElementById('soal-kesulitan').value = b.tingkat_kesulitan || 'menengah';
+            document.getElementById('soal-skor').value = b.skor;
+            document.getElementById('soal-tp').value = b.tp || '';
+            document.getElementById('soal-indikator').value = b.indikator || '';
+            document.getElementById('soal-stimulus').value = b.stimulus || '';
+            document.getElementById('soal-tags').value = Array.isArray(b.tags) ? b.tags.join(', ') : '';
+            document.getElementById('soal-pertanyaan').value = b.pertanyaan || '';
+            if (b.bentuk === 'PG') {
+                document.getElementById('soal-opsi-a').value = b.opsi_a || '';
+                document.getElementById('soal-opsi-b').value = b.opsi_b || '';
+                document.getElementById('soal-opsi-c').value = b.opsi_c || '';
+                document.getElementById('soal-opsi-d').value = b.opsi_d || '';
+                document.getElementById('soal-kunci-pg').value = b.kunci || 'A';
+            } else {
+                document.getElementById('soal-kunci-uraian').value = b.kunci || '';
+            }
+            document.getElementById('judul-form-soal').innerHTML = `<i class="fas fa-edit text-amber-600 mr-1"></i> Edit Butir Bank Soal`;
+            document.getElementById('btn-tambah-butir').innerHTML = `<i class="fas fa-check mr-1"></i> Simpan Perubahan Butir`;
+            document.getElementById('btn-batal-edit-soal').classList.remove('hidden');
+            switchSubTab('editor');
+            window.scrollTo({ top: 150, behavior: 'smooth' });
+        }
+
+        async function toggleStatusBank(id) {
+            if (!CC.isConfigured()) return;
+            const b = bankSoal.find(x => x.id === id);
+            if (!b) return;
+            const newStatus = b.status === 'validasi' ? 'draft' : 'validasi';
+            const { error } = await CC.client.from('bank_soal').update({ status: newStatus, updated_at: new Date().toISOString() }).eq('id', id);
+            if (error) { alert('Gagal mengubah status: ' + error.message); return; }
+            await muatBankSoal();
+        }
+
+        async function hapusBankButir(id) {
+            if (!CC.isConfigured()) return;
+            const used = bankUsage[id] || 0;
+            if (used > 0) {
+                if (!confirm(`Butir ini dipakai di ${used} paket soal. Hapus tetap? (Paket terkait akan kehilangan referensi.)`)) return;
+            } else {
+                if (!confirm('Hapus butir soal ini dari bank?')) return;
+            }
+            const { error } = await CC.client.from('bank_soal').delete().eq('id', id);
+            if (error) { alert('Gagal menghapus: ' + error.message); return; }
+            // remove from daftarSoal if present
+            daftarSoal = daftarSoal.filter(s => s.butir_id !== id);
+            renderDaftarSoal();
+            renderSemuaDokumen();
+            await muatBankSoal();
+        }
+
+        async function muatArsipRppSoal() {
+            if (!CC.isConfigured()) return;
+            const { data } = await CC.client.from('modul_ajar').select('*')
+                .eq('guru_id', profilGuru.id)
+                .order('created_at', { ascending: false });
+            arsipRppSoal = data || [];
+        }
+
+        function isiDropdownSumberGenerator() {
+            const sel = document.getElementById('gen-sumber');
+            const cur = sel.value;
+            sel.innerHTML = `<option value="cp">Tempel / Unggah CP</option>`;
+            arsipRppSoal.forEach(r => {
+                const konten = r.konten || {};
+                const jmlTP = Array.isArray(konten.listElemen)
+                    ? konten.listElemen.reduce((a, e) => a + (Array.isArray(e.tpList) ? e.tpList.length : 0), 0)
+                    : 0;
+                sel.innerHTML += `<option value="${esc(r.id)}">${esc(r.tingkat || '-')} - ${esc(r.mapel || profilGuru.mapel)} (${jmlTP} TP)</option>`;
+            });
+            sel.value = cur || 'cp';
+            muatSumberGenerator();
+        }
+
+        function muatSumberGenerator() {
+            const val = document.getElementById('gen-sumber').value;
+            const panelCp = document.getElementById('gen-panel-cp');
+            const panelRpp = document.getElementById('gen-panel-rpp');
+            if (val === 'cp') {
+                panelCp.classList.remove('hidden');
+                panelRpp.classList.add('hidden');
+                genTPs = [];
+            } else {
+                panelCp.classList.add('hidden');
+                panelRpp.classList.remove('hidden');
+                const rpp = arsipRppSoal.find(r => r.id === val);
+                const tps = [];
+                if (rpp) {
+                    const konten = rpp.konten || {};
+                    (konten.listElemen || []).forEach(el => {
+                        (el.tpList || []).forEach(tp => { tps.push(Object.assign({}, tp, { _elemen: el.nama })); });
+                    });
+                }
+                genTPs = tps.filter(tp => !/capaian pembelajaran|mata pelajaran/i.test(tp.deskripsi || ''));
+                renderGenTpList();
+            }
+        }
+
+        function parseCpGenerator() {
+            const raw = document.getElementById('gen-cp').value.trim();
+            if (!raw) { alert('Tempel naskah CP terlebih dahulu.'); return; }
+            const listElemen = ekstraksiCPKeElemen(raw);
+            const tps = [];
+            listElemen.forEach(el => {
+                (el.tpList || []).forEach(tp => { tps.push(Object.assign({}, tp, { _elemen: el.nama })); });
+            });
+            genTPs = tps.filter(tp => !/capaian pembelajaran|mata pelajaran/i.test(tp.deskripsi || ''));
+            document.getElementById('gen-panel-cp').classList.add('hidden');
+            document.getElementById('gen-panel-rpp').classList.remove('hidden');
+            renderGenTpList();
+        }
+
+        // Parser CP (salinan dari guru-rpp)
+        function ekstraksiCPKeElemen(text) {
+            const lines = text.split('\n');
+            const elemenList = [];
+            let currentElemen = null;
+            lines.forEach(line => {
+                const trimmed = line.trim();
+                if (!trimmed) return;
+                if (trimmed.toUpperCase().startsWith('ELEMEN') || trimmed.toUpperCase().includes('ELEMEN:')) {
+                    if (currentElemen) elemenList.push(currentElemen);
+                    currentElemen = { nama: trimmed.replace(/ELEMEN \d+:?/i, '').replace(/ELEMEN:?/i, '').trim() || 'Elemen Utama', cpTeks: '', tpList: [] };
+                } else if (currentElemen) {
+                    currentElemen.cpTeks += ' ' + trimmed;
+                }
+            });
+            if (currentElemen) elemenList.push(currentElemen);
+            if (elemenList.length === 0) {
+                const paragraphs = text.split('\n\n').filter(p => p.trim());
+                paragraphs.forEach((p, idx) => { elemenList.push({ nama: `Elemen Pembelajaran ${idx + 1}`, cpTeks: p.trim(), tpList: [] }); });
+            }
+            elemenList.forEach((el, eIdx) => {
+                const kalimat = el.cpTeks.split('.').map(k => k.trim()).filter(k => k.length > 10);
+                if (kalimat.length > 0) {
+                    kalimat.forEach((k, kIdx) => {
+                        el.tpList.push({ kode: `TP ${eIdx + 1}.${kIdx + 1}`, deskripsi: `Peserta didik mampu ${k.charAt(0).toLowerCase() + k.slice(1)}.`, jp: '4 JP', p3: 'Bernalar Kritis, Gotong Royong' });
+                    });
+                } else {
+                    el.tpList.push({ kode: `TP ${eIdx + 1}.1`, deskripsi: `Peserta didik mampu memahami dan menerapkan konsep ${el.nama}.`, jp: '4 JP', p3: 'Bernalar Kritis, Mandiri' });
+                }
+            });
+            return elemenList;
+        }
+
+        function renderGenTpList() {
+            const box = document.getElementById('gen-tp-list');
+            if (!genTPs.length) { box.innerHTML = '<p class="text-slate-400">Tidak ada TP. Analisis CP atau pilih RPP lain.</p>'; return; }
+            box.innerHTML = '';
+            genTPs.forEach((tp, i) => {
+                box.innerHTML += `
+                    <label class="flex items-start gap-2 text-[11px]">
+                        <input type="checkbox" class="gen-tp-check mt-0.5" data-idx="${i}" checked>
+                        <span><b>${esc(tp.kode)}</b> (${esc(tp._elemen)}) — ${esc((tp.deskripsi || '').slice(0, 90))}</span>
+                    </label>
+                `;
+            });
+        }
+
+        function generateOne(tp, bentuk, kesulitan) {
+            const elemen = tp._elemen || '';
+            const desk = tp.deskripsi || '';
+            const core = desk.replace(/^(Peserta didik mampu\s*)+/i, '').replace(/\.$/, '');
+            const kode = tp.kode;
+            const level = kesulitan === 'mudah' ? 'L1 (LotS - Pengetahuan/Pemahaman)' : kesulitan === 'sulit' ? 'L3 (HotS - Penalaran/Analisis)' : 'L2 (MotS - Penerapan)';
+            const skor = kesulitan === 'sulit' ? 5 : kesulitan === 'menengah' ? 3 : 2;
+            if (bentuk === 'PG') {
+                let pertanyaan;
+                if (kesulitan === 'mudah') pertanyaan = `Manakah pernyataan berikut yang paling tepat menggambarkan ${core}?`;
+                else if (kesulitan === 'menengah') pertanyaan = `Disajikan situasi pembelajaran terkait ${elemen}, peserta didik diminta menentukan ${core}. Pilihan yang paling tepat adalah ...`;
+                else pertanyaan = `Analisislah pernyataan berikut. Manakah pilihan yang paling tepat terkait ${core}?`;
+                const others = genTPs.filter(t => t.kode !== kode).map(t => (t.deskripsi || '').replace(/^Peserta didik mampu\s*/i, '').replace(/\.$/, ''));
+                const distractors = others.slice(0, 3);
+                while (distractors.length < 3) distractors.push('Tidak ada jawaban yang tepat');
+                const opts = [core, ...distractors].sort(() => Math.random() - 0.5);
+                const kunci = ['A','B','C','D'][opts.indexOf(core)];
+                return { tipe: 'PG', level, kesulitan, skor, tp_materi: `${kode} ${elemen}`.trim(), indikator: `Peserta didik dapat ${core}.`, pertanyaan, opsi_a: opts[0], opsi_b: opts[1], opsi_c: opts[2], opsi_d: opts[3], kunci, stimulus: '', tags: [String(elemen).toLowerCase()] };
+            }
+            let pertanyaan;
+            if (kesulitan === 'mudah') pertanyaan = `Jelaskan dengan singkat: ${core}!`;
+            else if (kesulitan === 'menengah') pertanyaan = `Bandingkan dan jelaskan: ${core}!`;
+            else pertanyaan = `Analisis dan berikan 2 contoh penerapan: ${core}!`;
+            const kunci = `Jawaban memuat poin utama: ${core}. (Pedoman penskoran sesuai rubrik guru.)`;
+            return { tipe: 'URAIAN', level, kesulitan, skor, tp_materi: `${kode} ${elemen}`.trim(), indikator: `Peserta didik dapat ${core}.`, pertanyaan, opsi_a: '', opsi_b: '', opsi_c: '', opsi_d: '', kunci, stimulus: '', tags: [String(elemen).toLowerCase()] };
+        }
+
+        function generateSoalOtomatis() {
+            const checked = Array.from(document.querySelectorAll('.gen-tp-check:checked')).map(c => genTPs[parseInt(c.dataset.idx, 10)]);
+            const tps = checked.length ? checked : genTPs;
+            if (!tps.length) { alert('Tidak ada TP. Analisis CP atau pilih RPP terlebih dahulu.'); return; }
+            const jumlah = Math.max(1, parseInt(document.getElementById('gen-jumlah').value, 10) || 10);
+            const mudah = Math.max(0, parseInt(document.getElementById('gen-k-mudah').value, 10) || 0);
+            const menengah = Math.max(0, parseInt(document.getElementById('gen-k-menengah').value, 10) || 0);
+            const sulit = Math.max(0, parseInt(document.getElementById('gen-k-sulit').value, 10) || 0);
+            let counts = { mudah, menengah, sulit };
+            let total = counts.mudah + counts.menengah + counts.sulit;
+            if (total === 0) { counts.menengah = jumlah; total = jumlah; }
+            if (total !== jumlah) { counts.menengah += (jumlah - total); if (counts.menengah < 0) { counts.mudah += counts.menengah; counts.menengah = 0; } }
+            const slots = [];
+            ['mudah','menengah','sulit'].forEach(k => { for (let i = 0; i < (counts[k] || 0); i++) slots.push(k); });
+            while (slots.length > jumlah) slots.pop();
+            while (slots.length < jumlah) slots.push('menengah');
+
+            const bentukOpt = document.getElementById('gen-bentuk').value;
+            const propPG = parseInt(document.getElementById('gen-prop-pg').value, 10) || 60;
+            const pgCount = bentukOpt === 'PG' ? slots.length : bentukOpt === 'URAIAN' ? 0 : Math.round(slots.length * (propPG / 100));
+
+            genPreview = [];
+            slots.forEach((kes, i) => {
+                const bentuk = (bentukOpt === 'PG') ? 'PG' : (bentukOpt === 'URAIAN') ? 'URAIAN' : (i < pgCount ? 'PG' : 'URAIAN');
+                const tp = tps[genPreview.length % tps.length];
+                genPreview.push(generateOne(tp, bentuk, kes));
+            });
+
+            // render preview
+            const box = document.getElementById('gen-preview');
+            box.innerHTML = '';
+            genPreview.forEach((s, i) => {
+                box.innerHTML += `<div class="border rounded p-2"><b>${i + 1}.</b> [${esc(s.tipe)}][${esc(s.kesulitan)}] ${esc(s.pertanyaan)}${s.tipe === 'PG' ? `<br><span class="text-slate-500">A. ${esc(s.opsi_a)} B. ${esc(s.opsi_b)} C. ${esc(s.opsi_c)} D. ${esc(s.opsi_d)} (Kunci: ${esc(s.kunci)})</span>` : `<br><span class="text-slate-500">Kunci: ${esc((s.kunci || '').slice(0, 80))}</span>`}</div>`;
+            });
+            document.getElementById('gen-preview-count').innerText = genPreview.length;
+            document.getElementById('gen-preview-wrap').classList.remove('hidden');
+        }
+
+        async function simpanHasilGenerate() {
+            if (!genPreview.length) { alert('Tidak ada hasil generate.'); return; }
+            if (!CC.isConfigured()) { alert('Penyimpanan memerlukan database.'); return; }
+            let saved = 0;
+            for (const s of genPreview) {
+                const item = Object.assign({}, s, { butir_id: null });
+                // simpan ke bank
+                const bankPayload = {
+                    guru_id: profilGuru.id,
+                    mapel: document.getElementById('meta-mapel').value.trim() || profilGuru.mapel || '',
+                    tingkat: document.getElementById('meta-tingkat').value,
+                    elemen: '',
+                    tp: item.tp_materi,
+                    indikator: item.indikator,
+                    bentuk: item.tipe,
+                    level_kognitif: item.level,
+                    tingkat_kesulitan: item.kesulitan || 'menengah',
+                    stimulus: item.stimulus || '',
+                    pertanyaan: item.pertanyaan,
+                    opsi_a: item.opsi_a, opsi_b: item.opsi_b, opsi_c: item.opsi_c, opsi_d: item.opsi_d,
+                    kunci: item.kunci,
+                    skor: item.skor,
+                    tags: item.tags || [],
+                    sumber: 'otomatis',
+                    tahun_ajaran: profilSekolah.tahun_ajaran,
+                    semester: profilSekolah.semester,
+                    updated_at: new Date().toISOString()
+                };
+                const { data, error } = await CC.client.from('bank_soal').insert([bankPayload]).select().single();
+                if (error) { alert('Gagal menyimpan butir: ' + error.message); continue; }
+                item.butir_id = data.id;
+                daftarSoal.push(item);
+                saved++;
+            }
+            batalGenerate();
+            renderDaftarSoal();
+            renderSemuaDokumen();
+            await muatBankSoal();
+            alert(saved + ' butir soal hasil generate disimpan ke bank & paket.');
+        }
+
+        function batalGenerate() {
+            genPreview = [];
+            document.getElementById('gen-preview-wrap').classList.add('hidden');
+            document.getElementById('gen-preview').innerHTML = '';
+        }
+
+        async function finalisasiPaket() {
+            if (!activePaketId) { alert('Simpan paket terlebih dahulu.'); return; }
+            if (!confirm('Finalisasi paket ini? Setelah final, butir soal akan di-snapshot dan tidak mengikuti perubahan bank.')) return;
+            // snapshot = salinan daftarSoal saat ini
+            const snapshot = JSON.parse(JSON.stringify(daftarSoal));
+            const { error } = await CC.client.from('paket_soal').update({
+                status: 'final',
+                snapshot: snapshot,
+                updated_at: new Date().toISOString()
+            }).eq('id', activePaketId);
+            if (error) { alert('Gagal finalisasi: ' + error.message); return; }
+            // update arsip
+            const p = arsipPaket.find(x => x.id === activePaketId);
+            if (p) { p.status = 'final'; p.snapshot = snapshot; }
+            document.getElementById('btn-finalisasi').classList.add('hidden');
+            alert('Paket berhasil difinalisasi (snapshot disimpan).');
+            await muatArsipPaket();
+        }
+
+        async function duplikatPaket() {
+            if (!activePaketId) { alert('Pilih paket terlebih dahulu.'); return; }
+            const orig = arsipPaket.find(x => x.id === activePaketId);
+            if (!orig) { alert('Paket tidak ditemukan.'); return; }
+            const konten = orig.konten || {};
+            const salinanSoal = JSON.parse(JSON.stringify(orig.daftar_soal || daftarSoal));
+            const payload = {
+                guru_id: profilGuru.id,
+                tahun_ajaran: profilSekolah.tahun_ajaran,
+                semester: profilSekolah.semester,
+                jenis_asesmen: (orig.jenis_asesmen || 'Sumatif Lingkup Materi') + ' (Duplikat)',
+                tingkat: orig.tingkat || 'Kelas 7',
+                mapel: orig.mapel || profilGuru.mapel || '',
+                tanggal_ujian: new Date().toLocaleDateString('en-CA'),
+                alokasi_waktu: orig.alokasi_waktu || '90 Menit',
+                daftar_soal: salinanSoal,
+                acak_soal: orig.acak_soal || false,
+                acak_opsi: orig.acak_opsi || false,
+                komposisi: orig.komposisi || {},
+                status: 'draft',
+                updated_at: new Date().toISOString()
+            };
+            const { data, error } = await CC.client.from('paket_soal').insert([payload]).select().single();
+            if (error) { alert('Gagal duplikat: ' + error.message); return; }
+            activePaketId = data.id;
+            daftarSoal = salinanSoal;
+            document.getElementById('meta-jenis').value = payload.jenis_asesmen;
+            document.getElementById('meta-tingkat').value = payload.tingkat;
+            document.getElementById('meta-tanggal').value = payload.tanggal_ujian;
+            document.getElementById('meta-waktu').value = payload.alokasi_waktu;
+            document.getElementById('meta-mapel').value = payload.mapel;
+            document.getElementById('btn-hapus-paket').classList.remove('hidden');
+            document.getElementById('btn-finalisasi').classList.remove('hidden');
+            document.getElementById('btn-duplikat').classList.remove('hidden');
+            renderDaftarSoal();
+            renderSemuaDokumen();
+            await muatArsipPaket();
+            alert('Paket berhasil diduplikat.');
+        }
+
+        function seededShuffle(arr, seed) {
+            const a = arr.slice();
+            let s = seed || 1;
+            for (let i = a.length - 1; i > 0; i--) {
+                s = (s * 9301 + 49297) % 233280;
+                const j = Math.floor((s / 233280) * (i + 1));
+                const tmp = a[i]; a[i] = a[j]; a[j] = tmp;
+            }
+            return a;
+        }
+
+        function cetakPaketAcak(label) {
+            if (!daftarSoal.length) { alert('Belum ada butir soal.'); return; }
+            const seed = label === 'A' ? 1 : 2;
+            const shuffled = seededShuffle(daftarSoal, seed);
+            const acakOpsi = document.getElementById('meta-acak-opsi').checked;
+            const html = bangunNaskahHTML(shuffled, acakOpsi);
+            const tmpId = 'tmp-naskah-paket';
+            let tmp = document.getElementById(tmpId);
+            if (!tmp) {
+                tmp = document.createElement('div');
+                tmp.id = tmpId;
+                tmp.className = 'hidden';
+                document.body.appendChild(tmp);
+            }
+            tmp.innerHTML = html;
+            CC.printArea(tmpId, 'Cetak Naskah Soal - Paket ' + label);
+        }
+
+        function lihatRiwayat(id) {
+            const b = bankSoal.find(x => x.id === id);
+            if (!b) return;
+            const r = Array.isArray(b.riwayat) ? b.riwayat : [];
+            if (!r.length) { alert(`Butir ini belum pernah diedit (versi ${b.versi || 1}).`); return; }
+            const lines = r.map((v, i) => `v${v.versi || (r.length - i)} (${(v.updated_at || v.created_at || '').slice(0,10)}): ${(v.pertanyaan || '').slice(0, 60)}`).join('\n');
+            alert(`Riwayat butir (versi saat ini: ${b.versi || 1}):\n${lines}`);
+        }
+
+        // ---------- Cetak LJK ----------
+        function cetakLJK() {
+            if (!daftarSoal.length) { alert('Belum ada butir soal.'); return; }
+            const pg = daftarSoal.filter(s => s.tipe === 'PG');
+            if (!pg.length) { alert('LJK hanya untuk soal Pilihan Ganda.'); return; }
+            const jenis = document.getElementById('meta-jenis').value;
+            const tingkat = document.getElementById('meta-tingkat').value;
+            const mapel = document.getElementById('meta-mapel').value.trim() || profilGuru.mapel || '-';
+            const tanggal = document.getElementById('meta-tanggal').value || '-';
+            let html = `
+                ${getKopSuratHTML()}
+                <div class="text-center font-bold mb-3">
+                    <h3 class="text-sm uppercase">LEMBAR JAWABAN KOMPUTER (LJK)</h3>
+                    <p class="text-xs font-normal">${esc(jenis)} | ${esc(mapel)} | ${esc(tingkat)}</p>
+                </div>
+                <table class="w-full text-xs border-collapse border border-slate-800 mb-4">
+                    <tr>
+                        <td class="p-1.5 border border-slate-800 font-semibold w-32">Nama Peserta</td>
+                        <td class="p-1.5 border border-slate-800">: ................................................</td>
+                        <td class="p-1.5 border border-slate-800 font-semibold w-32">Kelas / No. Absen</td>
+                        <td class="p-1.5 border border-slate-800">: ................ / ................</td>
+                    </tr>
+                    <tr>
+                        <td class="p-1.5 border border-slate-800 font-semibold">Hari / Tanggal</td>
+                        <td class="p-1.5 border border-slate-800">: ${esc(tanggal)}</td>
+                        <td class="p-1.5 border border-slate-800 font-semibold">Alokasi Waktu</td>
+                        <td class="p-1.5 border border-slate-800">: ${esc(document.getElementById('meta-waktu').value.trim() || '90 Menit')}</td>
+                    </tr>
+                </table>
+                <p class="text-[11px] mb-2"><b>Petunjuk:</b> Hitamkan (●) salah satu huruf A, B, C, atau D yang dianggap benar.</p>
+                <table class="w-full text-xs border-collapse border border-slate-400">
+                    <thead>
+                        <tr class="bg-slate-100">
+                            <th class="p-1.5 border border-slate-400 text-center w-12">No</th>
+                            <th class="p-1.5 border border-slate-400 text-center">A</th>
+                            <th class="p-1.5 border border-slate-400 text-center">B</th>
+                            <th class="p-1.5 border border-slate-400 text-center">C</th>
+                            <th class="p-1.5 border border-slate-400 text-center">D</th>
+                            <th class="p-1.5 border border-slate-400 text-center w-12">No</th>
+                            <th class="p-1.5 border border-slate-400 text-center">A</th>
+                            <th class="p-1.5 border border-slate-400 text-center">B</th>
+                            <th class="p-1.5 border border-slate-400 text-center">C</th>
+                            <th class="p-1.5 border border-slate-400 text-center">D</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+            `;
+            const half = Math.ceil(pg.length / 2);
+            for (let i = 0; i < half; i++) {
+                const left = i + 1;
+                const right = i + 1 + half;
+                html += `<tr>`;
+                html += `<td class="p-1.5 border border-slate-400 text-center font-bold">${left}</td>`;
+                for (let k = 0; k < 4; k++) html += `<td class="p-1.5 border border-slate-400 text-center">○</td>`;
+                if (right <= pg.length) {
+                    html += `<td class="p-1.5 border border-slate-400 text-center font-bold">${right}</td>`;
+                    for (let k = 0; k < 4; k++) html += `<td class="p-1.5 border border-slate-400 text-center">○</td>`;
+                } else {
+                    html += `<td class="p-1.5 border border-slate-400"></td><td class="p-1.5 border border-slate-400"></td><td class="p-1.5 border border-slate-400"></td><td class="p-1.5 border border-slate-400"></td><td class="p-1.5 border border-slate-400"></td>`;
+                }
+                html += `</tr>`;
+            }
+            html += `</tbody></table>`;
+            const tmpId = 'tmp-ljk';
+            let tmp = document.getElementById(tmpId);
+            if (!tmp) { tmp = document.createElement('div'); tmp.id = tmpId; tmp.className = 'hidden'; document.body.appendChild(tmp); }
+            tmp.innerHTML = html;
+            CC.printArea(tmpId, 'Cetak LJK');
+        }
+
+        // ---------- Import/Export CSV ----------
+        function eksporBankSoalCSV() {
+            if (!bankSoal.length) { alert('Bank soal kosong.'); return; }
+            const header = ['tp','indikator','bentuk','level_kognitif','tingkat_kesulitan','stimulus','pertanyaan','opsi_a','opsi_b','opsi_c','opsi_d','kunci','skor','tags'];
+            const rows = [header.join(',')];
+            bankSoal.forEach(b => {
+                const vals = header.map(h => {
+                    let v = b[h];
+                    if (Array.isArray(v)) v = v.join(';');
+                    v = String(v == null ? '' : v).replace(/"/g, '""');
+                    return `"${v}"`;
+                });
+                rows.push(vals.join(','));
+            });
+            const csv = rows.join('\n');
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `bank_soal_${new Date().toISOString().slice(0,10)}.csv`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        async function imporBankSoalCSV(input) {
+            const file = input.files && input.files[0];
+            if (!file) return;
+            const text = await file.text();
+            const lines = text.split(/\r?\n/).filter(l => l.trim());
+            if (lines.length < 2) { alert('File CSV kosong atau tidak valid.'); input.value = ''; return; }
+            const header = parseCsvLine(lines[0]).map(h => h.trim().toLowerCase());
+            const idx = (name) => header.indexOf(name);
+            let imported = 0;
+            for (let i = 1; i < lines.length; i++) {
+                const cols = parseCsvLine(lines[i]);
+                if (cols.length === 0) continue;
+                const get = (name) => { const j = idx(name); return j >= 0 ? (cols[j] || '').trim() : ''; };
+                const item = {
+                    guru_id: profilGuru.id,
+                    mapel: document.getElementById('meta-mapel').value.trim() || profilGuru.mapel || '',
+                    tingkat: document.getElementById('meta-tingkat').value,
+                    tp: get('tp'),
+                    indikator: get('indikator'),
+                    bentuk: (get('bentuk') || 'PG').toUpperCase() === 'URAIAN' ? 'URAIAN' : 'PG',
+                    level_kognitif: get('level_kognitif') || 'L2 (MotS - Penerapan)',
+                    tingkat_kesulitan: (get('tingkat_kesulitan') || 'menengah').toLowerCase(),
+                    stimulus: get('stimulus'),
+                    pertanyaan: get('pertanyaan'),
+                    opsi_a: get('opsi_a'), opsi_b: get('opsi_b'), opsi_c: get('opsi_c'), opsi_d: get('opsi_d'),
+                    kunci: get('kunci') || (get('bentuk').toUpperCase() === 'URAIAN' ? '' : 'A'),
+                    skor: parseInt(get('skor'), 10) || 2,
+                    tags: get('tags') ? get('tags').split(';').map(t => t.trim()).filter(Boolean) : [],
+                    sumber: 'manual',
+                    tahun_ajaran: profilSekolah.tahun_ajaran,
+                    semester: profilSekolah.semester,
+                    versi: 1,
+                    riwayat: [],
+                    updated_at: new Date().toISOString()
+                };
+                if (!item.pertanyaan) continue;
+                if (!CC.isConfigured()) { daftarSoal.push(bankItemToSoal(Object.assign({ id: null }, item))); imported++; continue; }
+                const { error } = await CC.client.from('bank_soal').insert([item]);
+                if (error) { console.error('Import error:', error); continue; }
+                imported++;
+            }
+            input.value = '';
+            await muatBankSoal();
+            alert(imported + ' butir soal berhasil diimpor.');
+        }
+
+        function parseCsvLine(line) {
+            const result = [];
+            let cur = '';
+            let inQuotes = false;
+            for (let i = 0; i < line.length; i++) {
+                const ch = line[i];
+                if (inQuotes) {
+                    if (ch === '"') {
+                        if (line[i + 1] === '"') { cur += '"'; i++; }
+                        else inQuotes = false;
+                    } else cur += ch;
+                } else {
+                    if (ch === '"') inQuotes = true;
+                    else if (ch === ',') { result.push(cur); cur = ''; }
+                    else cur += ch;
+                }
+            }
+            result.push(cur);
+            return result;
         }
 
         async function logout() {

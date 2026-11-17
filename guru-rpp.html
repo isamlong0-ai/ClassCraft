@@ -31,7 +31,26 @@
     </header>
 
     <main class="max-w-7xl mx-auto px-4 py-6 w-full flex-1 space-y-6">
-        
+
+        <!-- Baris Arsip RPP Tersimpan -->
+        <div class="bg-white p-4 rounded-xl shadow-md border border-slate-200 flex flex-wrap justify-between items-center gap-3">
+            <div class="flex flex-wrap items-center gap-2 text-xs">
+                <span class="font-bold text-indigo-700"><i class="fas fa-folder-open mr-1"></i> RPP Tersimpan:</span>
+                <select id="select-arsip-rpp" onchange="pilihArsipRpp(this.value)" class="p-2 border rounded-lg bg-slate-50 font-medium min-w-[260px]">
+                    <option value="">-- RPP Baru (belum tersimpan) --</option>
+                </select>
+                <button type="button" onclick="buatRppBaru()" class="bg-slate-200 hover:bg-slate-300 text-slate-700 px-3 py-2 rounded-lg font-medium transition text-xs">
+                    <i class="fas fa-file-medical mr-1"></i> RPP Baru
+                </button>
+                <button type="button" id="btn-hapus-rpp" onclick="hapusRppAktif()" class="hidden bg-red-100 hover:bg-red-200 text-red-700 px-3 py-2 rounded-lg font-medium transition text-xs">
+                    <i class="fas fa-trash mr-1"></i> Hapus
+                </button>
+            </div>
+            <button type="button" id="btn-simpan-rpp" onclick="simpanRppKeSupabase()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs px-4 py-2 rounded-lg font-bold transition shadow">
+                <i class="fas fa-cloud-upload-alt mr-1"></i> Simpan RPP ke Database
+            </button>
+        </div>
+
         <!-- Panel Input Dokumen CP -->
         <div class="bg-white p-6 rounded-xl shadow-md border space-y-6">
             <div class="border-b pb-3 flex flex-col md:flex-row justify-between items-start md:items-center gap-2">
@@ -150,6 +169,11 @@
         let dbSekolah = Object.assign({}, CC.defaults.sekolah);
         let dbRombel = [];
 
+        let currentListElemen = null;
+        let currentConfig = null;
+        let arsipRpp = [];
+        let activeRppId = null;
+
         function escapeHtml(value) {
             return String(value == null ? '' : value)
                 .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
@@ -176,9 +200,9 @@
             } else {
                 jenjang.forEach(tk => { sel.innerHTML += `<option value="${escapeHtml(tk)}">${escapeHtml(tk)}</option>`; });
             }
-        });
 
-        // Membaca file lokal jika diunggah
+            await muatArsipRpp();
+        });
         function bacaFileCP(input) {
             const file = input.files[0];
             if (file) {
@@ -222,6 +246,12 @@ Peserta didik mampu menginisiasi kegiatan bersama dalam merawat keberagaman suku
 
             // Ekstraksi Elemen & TP dari Teks CP
             const listElemen = ekstraksiCPKeElemen(rawCP);
+
+            currentListElemen = listElemen;
+            currentConfig = { tingkat: tingkat || 'Kelas 7', semester: semester, model: model, waktu: waktu, rawCP: rawCP };
+            activeRppId = null;
+            document.getElementById('select-arsip-rpp').value = '';
+            document.getElementById('btn-hapus-rpp').classList.add('hidden');
 
             // Generate Tampilan ATP
             renderDokumenATP(listElemen, rombel, semester);
@@ -462,6 +492,159 @@ Peserta didik mampu menginisiasi kegiatan bersama dalam merawat keberagaman suku
 
         function exportDoc(elemId, filename = 'Dokumen_Perangkat_Ajar') {
             CC.exportWord(elemId, filename);
+        }
+
+        function semesterKeKode(v) {
+            return /ganjil/i.test(String(v || '')) ? 'Ganjil' : 'Genap';
+        }
+        function semesterKeLabel(kode) {
+            return String(kode || '').toLowerCase() === 'genap' ? '2 (Genap)' : '1 (Ganjil)';
+        }
+
+        async function muatArsipRpp() {
+            if (!CC.isConfigured()) return;
+            const { data, error } = await CC.client
+                .from('modul_ajar')
+                .select('*')
+                .eq('guru_id', session.id)
+                .eq('tahun_ajaran', dbSekolah.tahunAjaran)
+                .eq('semester', dbSekolah.semester)
+                .order('created_at', { ascending: false });
+            if (error) { console.error('Gagal memuat arsip RPP:', error); return; }
+            arsipRpp = data || [];
+            const sel = document.getElementById('select-arsip-rpp');
+            sel.innerHTML = `<option value="">-- RPP Baru (belum tersimpan) --</option>`;
+            arsipRpp.forEach(r => {
+                const konten = r.konten || {};
+                const jmlElemen = Array.isArray(konten.listElemen) ? konten.listElemen.length : 0;
+                const jmlTP = Array.isArray(konten.listElemen)
+                    ? konten.listElemen.reduce((a, e) => a + (Array.isArray(e.tpList) ? e.tpList.length : 0), 0)
+                    : 0;
+                sel.innerHTML += `<option value="${escapeHtml(r.id)}">${escapeHtml(r.tingkat || '-') } - ${escapeHtml(r.mapel || session.mapel)} (${jmlElemen} elemen, ${jmlTP} TP)</option>`;
+            });
+            if (activeRppId) sel.value = activeRppId;
+        }
+
+        function buatRppBaru() {
+            activeRppId = null;
+            document.getElementById('select-arsip-rpp').value = '';
+            document.getElementById('text-cp').value = '';
+            document.getElementById('cfg-rombel').value = (dbRombel.length ? [...new Set(dbRombel.map(r => r.tingkat).filter(Boolean))].sort()[0] : 'Kelas 7') || 'Kelas 7';
+            document.getElementById('cfg-semester').value = dbSekolah.semester === 'Genap' ? '2 (Genap)' : '1 (Ganjil)';
+            document.getElementById('cfg-model').value = 'Problem Based Learning (PBL)';
+            document.getElementById('cfg-jp').value = '2 x 40 Menit (2 JP)';
+            currentListElemen = null;
+            currentConfig = null;
+            document.getElementById('section-output').classList.add('hidden');
+            document.getElementById('btn-hapus-rpp').classList.add('hidden');
+        }
+
+        function pilihArsipRpp(rppId) {
+            if (!rppId) { buatRppBaru(); return; }
+            const rpp = arsipRpp.find(r => r.id === rppId);
+            if (!rpp) return;
+            muatRppTersimpan(rpp);
+        }
+
+        function muatRppTersimpan(rpp) {
+            const konten = rpp.konten || {};
+            activeRppId = rpp.id;
+            document.getElementById('select-arsip-rpp').value = rpp.id;
+            document.getElementById('cfg-rombel').value = rpp.tingkat || 'Kelas 7';
+            document.getElementById('cfg-semester').value = semesterKeLabel(rpp.semester);
+            document.getElementById('cfg-model').value = rpp.model || 'Problem Based Learning (PBL)';
+            document.getElementById('cfg-jp').value = rpp.waktu || '2 x 40 Menit (2 JP)';
+            document.getElementById('text-cp').value = konten.rawCP || '';
+
+            currentListElemen = Array.isArray(konten.listElemen) ? konten.listElemen : null;
+            currentConfig = {
+                tingkat: rpp.tingkat || 'Kelas 7',
+                semester: rpp.semester || dbSekolah.semester,
+                model: rpp.model || 'Problem Based Learning (PBL)',
+                waktu: rpp.waktu || '2 x 40 Menit (2 JP)',
+                rawCP: konten.rawCP || ''
+            };
+
+            if (currentListElemen && currentListElemen.length) {
+                const rombel = { tingkat: currentConfig.tingkat };
+                const semesterLabel = semesterKeLabel(currentConfig.semester);
+                renderDokumenATP(currentListElemen, rombel, semesterLabel);
+                renderDokumenRPPUth(currentListElemen, rombel, semesterLabel, currentConfig.model, currentConfig.waktu);
+                document.getElementById('section-output').classList.remove('hidden');
+                switchHasilTab('atp');
+            } else {
+                document.getElementById('section-output').classList.add('hidden');
+            }
+            document.getElementById('btn-hapus-rpp').classList.remove('hidden');
+        }
+
+        async function simpanRppKeSupabase() {
+            if (!currentListElemen || !currentListElemen.length) {
+                alert('Analisis CP terlebih dahulu (klik "Analisis CP & Hasilkan ATP + RPP") sebelum menyimpan RPP.');
+                return;
+            }
+            if (!CC.isConfigured()) {
+                alert('Penyimpanan memerlukan koneksi database (Supabase).');
+                return;
+            }
+            const btn = document.getElementById('btn-simpan-rpp');
+            btn.disabled = true;
+            btn.innerHTML = `<i class="fas fa-spinner fa-spin mr-1"></i> Menyimpan...`;
+
+            const tingkat = document.getElementById('cfg-rombel').value || 'Kelas 7';
+            const semesterKode = semesterKeKode(document.getElementById('cfg-semester').value);
+            const model = document.getElementById('cfg-model').value;
+            const waktu = document.getElementById('cfg-jp').value.trim();
+            const rawCP = document.getElementById('text-cp').value.trim();
+
+            const payload = {
+                guru_id: session.id,
+                mapel: session.mapel || '',
+                tingkat: tingkat,
+                semester: semesterKode,
+                tahun_ajaran: dbSekolah.tahunAjaran,
+                model: model,
+                konten: {
+                    listElemen: currentListElemen,
+                    rawCP: rawCP,
+                    model: model,
+                    waktu: waktu,
+                    tingkat: tingkat
+                },
+                updated_at: new Date().toISOString()
+            };
+
+            let res;
+            if (activeRppId) {
+                res = await CC.client.from('modul_ajar').update(payload).eq('id', activeRppId).select().single();
+            } else {
+                res = await CC.client.from('modul_ajar').insert([payload]).select().single();
+            }
+
+            btn.disabled = false;
+            btn.innerHTML = `<i class="fas fa-cloud-upload-alt mr-1"></i> Simpan RPP ke Database`;
+
+            if (res.error) {
+                alert('Gagal menyimpan RPP: ' + res.error.message);
+            } else {
+                activeRppId = res.data.id;
+                currentConfig = { tingkat: tingkat, semester: semesterKode, model: model, waktu: waktu, rawCP: rawCP };
+                document.getElementById('btn-hapus-rpp').classList.remove('hidden');
+                await muatArsipRpp();
+                alert('RPP berhasil tersimpan ke database!');
+            }
+        }
+
+        async function hapusRppAktif() {
+            if (!activeRppId || !confirm('Hapus permanen RPP ini dari database?')) return;
+            const { error } = await CC.client.from('modul_ajar').delete().eq('id', activeRppId);
+            if (error) {
+                alert('Gagal menghapus RPP: ' + error.message);
+            } else {
+                buatRppBaru();
+                await muatArsipRpp();
+                alert('RPP berhasil dihapus.');
+            }
         }
 
         function logout() {

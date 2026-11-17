@@ -97,10 +97,13 @@ create table if not exists public.modul_ajar (
     guru_id    uuid references public.guru(id) on delete set null,
     rombel_id  uuid references public.rombel(id) on delete set null,
     mapel      text,
+    tingkat    text,
     semester   text,
     model      text,
+    tahun_ajaran text,
     konten     jsonb not null default '{}'::jsonb,
-    created_at timestamptz not null default now()
+    created_at timestamptz not null default now(),
+    updated_at timestamptz not null default now()
 );
 
 -- -------------------------------------------------------------
@@ -157,8 +160,60 @@ create table if not exists public.paket_soal (
     tanggal_ujian date default current_date,
     alokasi_waktu text not null default '90 Menit',
     daftar_soal   jsonb not null default '[]'::jsonb,
+    kode_paket    text,
+    acak_soal     boolean not null default false,
+    acak_opsi     boolean not null default false,
+    komposisi     jsonb not null default '{}'::jsonb,
+    status        text not null default 'draft' check (status in ('draft','final')),
+    snapshot      jsonb,
     created_at    timestamptz not null default now(),
     updated_at    timestamptz not null default now()
+);
+
+-- -------------------------------------------------------------
+-- Tabel: bank_soal (butir soal reusable)
+-- -------------------------------------------------------------
+create table if not exists public.bank_soal (
+    id                 uuid primary key default gen_random_uuid(),
+    guru_id            uuid not null references public.guru(id) on delete cascade,
+    mapel              text not null default '',
+    tingkat            text not null default 'Kelas 7',
+    elemen             text default '',
+    tp                 text default '',
+    indikator          text default '',
+    bentuk             text not null default 'PG' check (bentuk in ('PG','URAIAN')),
+    level_kognitif     text default 'L1 (LotS - Pengetahuan/Pemahaman)',
+    tingkat_kesulitan  text not null default 'menengah' check (tingkat_kesulitan in ('mudah','menengah','sulit')),
+    stimulus           text default '',
+    pertanyaan         text not null default '',
+    opsi_a             text default '',
+    opsi_b             text default '',
+    opsi_c             text default '',
+    opsi_d             text default '',
+    kunci              text default '',
+    skor               int not null default 1,
+    tags               text[] not null default '{}',
+    sumber             text not null default 'manual' check (sumber in ('manual','otomatis')),
+    status             text not null default 'draft' check (status in ('draft','validasi')),
+    tahun_ajaran       text not null default '2025/2026',
+    semester           text not null default 'Ganjil' check (semester in ('Ganjil','Genap')),
+    versi              int not null default 1,
+    riwayat            jsonb not null default '[]'::jsonb,
+    created_at         timestamptz not null default now(),
+    updated_at         timestamptz not null default now()
+);
+
+-- -------------------------------------------------------------
+-- Tabel: paket_soal_butir (pivot paket <-> butir bank)
+-- -------------------------------------------------------------
+create table if not exists public.paket_soal_butir (
+    id            uuid primary key default gen_random_uuid(),
+    paket_id      uuid not null references public.paket_soal(id) on delete cascade,
+    butir_id      uuid not null references public.bank_soal(id) on delete restrict,
+    urutan        int not null default 0,
+    skor_override int,
+    created_at    timestamptz not null default now(),
+    unique (paket_id, butir_id)
 );
 
 -- -------------------------------------------------------------
@@ -180,6 +235,12 @@ create index if not exists idx_presensi_siswa      on public.presensi(siswa_id);
 create index if not exists idx_presensi_ta_sem     on public.presensi(tahun_ajaran, semester);
 create index if not exists idx_paket_soal_guru     on public.paket_soal(guru_id);
 create index if not exists idx_paket_soal_ta_sem   on public.paket_soal(tahun_ajaran, semester);
+create index if not exists idx_bank_soal_guru_mapel   on public.bank_soal(guru_id, mapel);
+create index if not exists idx_bank_soal_tingkat       on public.bank_soal(tingkat);
+create index if not exists idx_bank_soal_ta_sem        on public.bank_soal(tahun_ajaran, semester);
+create index if not exists idx_paket_soal_butir_paket  on public.paket_soal_butir(paket_id);
+create index if not exists idx_paket_soal_butir_butir  on public.paket_soal_butir(butir_id);
+create index if not exists idx_modul_ajar_ta          on public.modul_ajar(tahun_ajaran, semester);
 
 -- Hubungkan profil guru ke user Auth
 alter table public.guru drop constraint if exists guru_id_auth_fkey;
@@ -433,7 +494,7 @@ end $$;
 do $$
 declare t text;
 begin
-    foreach t in array array['jurnal_mengajar', 'presensi', 'paket_soal'] loop
+    foreach t in array array['jurnal_mengajar', 'presensi', 'paket_soal', 'bank_soal', 'modul_ajar'] loop
         execute format('drop trigger if exists trg_%1$s_updated on public.%1$s;', t);
         execute format('create trigger trg_%1$s_updated before update on public.%1$s for each row execute function public.cc_set_updated_at();', t);
     end loop;
@@ -491,6 +552,18 @@ create policy write_presensi on public.presensi for all to authenticated
 create policy read_paket_soal on public.paket_soal for select to authenticated using (true);
 create policy write_paket_soal on public.paket_soal for all to authenticated
     using (guru_id = auth.uid() or public.is_admin()) with check (guru_id = auth.uid() or public.is_admin());
+
+alter table public.bank_soal enable row level security;
+alter table public.paket_soal_butir enable row level security;
+
+create policy read_bank_soal on public.bank_soal for select to authenticated using (true);
+create policy write_bank_soal on public.bank_soal for all to authenticated
+    using (guru_id = auth.uid() or public.is_admin()) with check (guru_id = auth.uid() or public.is_admin());
+
+create policy read_paket_soal_butir on public.paket_soal_butir for select to authenticated using (true);
+create policy write_paket_soal_butir on public.paket_soal_butir for all to authenticated
+    using (exists (select 1 from public.paket_soal p where p.id = paket_soal_butir.paket_id and (p.guru_id = auth.uid() or public.is_admin())))
+    with check (exists (select 1 from public.paket_soal p where p.id = paket_soal_butir.paket_id and (p.guru_id = auth.uid() or public.is_admin())));
 
 -- =============================================================
 -- Data awal (seed): sekolah, guru (+user Auth), rombel, siswa
