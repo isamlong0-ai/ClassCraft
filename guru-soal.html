@@ -1553,7 +1553,14 @@
                         (el.tpList || []).forEach(tp => { tps.push(Object.assign({}, tp, { _elemen: el.nama })); });
                     });
                 }
-                genTPs = tps.filter(tp => !/capaian pembelajaran|mata pelajaran/i.test(tp.deskripsi || ''));
+                genTPs = tps.filter(tp => {
+                    const d = tp.deskripsi || '';
+                    if (!d || d.length < 15) return false;
+                    if (/capaian pembelajaran|mata pelajaran/i.test(d)) return false;
+                    const core = d.replace(/^(Peserta didik mampu\s*)+/i, '').trim();
+                    if (!core || core === core.toUpperCase()) return false;
+                    return true;
+                });
                 renderGenTpList();
             }
         }
@@ -1591,7 +1598,13 @@
                 if (!trimmed) return;
                 if (trimmed.toUpperCase().startsWith('ELEMEN') || trimmed.toUpperCase().includes('ELEMEN:')) {
                     if (currentElemen) elemenList.push(currentElemen);
-                    currentElemen = { nama: trimmed.replace(/ELEMEN \d+:?/i, '').replace(/ELEMEN:?/i, '').trim() || 'Elemen Utama', cpTeks: '', tpList: [] };
+                    let __body = trimmed.replace(/^ELEMEN\s*\d*\s*:?/i, '').trim();
+                    let __dot = __body.indexOf('.');
+                    let __nama = __body, __rest = '';
+                    if (__dot > 0 && __dot < 60) { __nama = __body.slice(0, __dot).trim(); __rest = __body.slice(__dot + 1).trim(); }
+                    if (!__nama || __nama.length > 70) { __nama = 'Elemen Utama'; }
+                    if (__nama === __nama.toUpperCase() && __nama.length > 3) { __nama = __nama.toLowerCase().replace(/(?:^|\s)\S/g, c => c.toUpperCase()).replace(/\b(Dan|Di|Ke|Dari|Untuk|Dengan|Atau|Yang|Dan)\b/g, w => w.toLowerCase()); }
+                    currentElemen = { nama: __nama, cpTeks: __rest, tpList: [] };
                 } else if (currentElemen) {
                     currentElemen.cpTeks += ' ' + trimmed;
                 }
@@ -1602,10 +1615,10 @@
                 paragraphs.forEach((p, idx) => { elemenList.push({ nama: `Elemen Pembelajaran ${idx + 1}`, cpTeks: p.trim(), tpList: [] }); });
             }
             elemenList.forEach((el, eIdx) => {
-                const kalimat = el.cpTeks.split('.').map(k => k.trim()).filter(k => k.length > 10);
+                const kalimat = el.cpTeks.split('.').map(k => k.trim()).filter(k => k.length > 10 && k.length < 200 && !/^ELEMEN/i.test(k) && !(k === k.toUpperCase() && k.length > 5));
                 if (kalimat.length > 0) {
                     kalimat.forEach((k, kIdx) => {
-                        el.tpList.push({ kode: `TP ${eIdx + 1}.${kIdx + 1}`, deskripsi: `Peserta didik mampu ${k.charAt(0).toLowerCase() + k.slice(1)}.`, jp: '4 JP', p3: 'Bernalar Kritis, Gotong Royong' });
+                        el.tpList.push({ kode: `TP ${eIdx + 1}.${kIdx + 1}`, deskripsi: /^peserta didik mampu/i.test(k) ? `${k.charAt(0).toUpperCase() + k.slice(1)}.` : `Peserta didik mampu ${k.charAt(0).toLowerCase() + k.slice(1)}.`, jp: '4 JP', p3: 'Bernalar Kritis, Gotong Royong' });
                     });
                 } else {
                     el.tpList.push({ kode: `TP ${eIdx + 1}.1`, deskripsi: `Peserta didik mampu memahami dan menerapkan konsep ${el.nama}.`, jp: '4 JP', p3: 'Bernalar Kritis, Mandiri' });
