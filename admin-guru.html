@@ -219,12 +219,31 @@
 
         function exportExcel() {
             const list = dbUsers.filter(u => u.role === 'guru');
-            let table = `<table border="1"><tr><th>NIP</th><th>Nama</th><th>Mapel</th><th>Pangkat</th><th>Golongan</th></tr>`;
-            list.forEach(g => { table += `<tr><td>'${g.username}</td><td>${g.nama}</td><td>${g.mapel}</td><td>${g.pangkat}</td><td>${g.gol}</td></tr>`; });
-            table += `</table>`;
 
-            const blob = new Blob(['\ufeff' + table], { type: 'application/vnd.ms-excel' });
-            const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'Data_Guru_SMP.xls'; a.click();
+            const kop = dbSekolah.imgKop
+                ? `<div class="kop-wrap text-center"><img src="${dbSekolah.imgKop}" class="kop-img"></div>`
+                : `<div class="kop-wrap"><div class="kop-text"><h2>${dbSekolah.nama}</h2><p>NPSN: ${dbSekolah.npsn || '-'}</p></div></div>`;
+
+            let rows = '';
+            list.forEach(g => {
+                rows += `<tr>
+                    <td style="mso-number-format:'\\@'">${g.username}</td>
+                    <td>${g.nama}</td>
+                    <td>${g.mapel}</td>
+                    <td>${g.pangkat}</td>
+                    <td>${g.gol}</td>
+                </tr>`;
+            });
+
+            const content = `
+                ${kop}
+                <h3>DATA GURU</h3>
+                <table class="border">
+                    <thead><tr><th>NIP</th><th>Nama</th><th>Mapel</th><th>Pangkat</th><th>Golongan</th></tr></thead>
+                    <tbody>${rows}</tbody>
+                </table>
+            `;
+            CC.exportExcel(content, 'Data_Guru_SMP');
         }
 
         function logout() { CC.logout().finally(() => { window.location.href = 'index.html'; }); }

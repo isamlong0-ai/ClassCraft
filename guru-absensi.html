@@ -35,9 +35,13 @@
 
     <main class="max-w-7xl mx-auto px-4 py-6 w-full flex-1 space-y-6">
 
-        <!-- Filter Utama Kelas, Tanggal & Mapel -->
-        <div class="bg-white p-5 rounded-xl shadow-md border border-slate-200">
-            <div class="grid grid-cols-1 md:grid-cols-4 gap-4 text-xs items-end">
+        <!-- Filter Utama Tahun Ajaran, Kelas, Tanggal & Mapel -->
+        <div class="bg-white p-5 rounded-xl shadow-md border border-slate-200 space-y-3">
+            <div class="grid grid-cols-1 md:grid-cols-5 gap-4 text-xs items-end">
+                <div>
+                    <label class="block font-bold text-slate-700 mb-1">Tahun Ajaran</label>
+                    <select id="filter-ta" onchange="gantiTAAbsensi()" class="w-full p-2.5 border rounded-lg bg-slate-50 font-semibold text-indigo-700"></select>
+                </div>
                 <div>
                     <label class="block font-bold text-slate-700 mb-1">Pilih Kelas / Rombel</label>
                     <select id="filter-rombel" onchange="muatDataPresensi()" class="w-full p-2.5 border rounded-lg bg-slate-50 font-semibold text-indigo-700"></select>
@@ -55,6 +59,9 @@
                         <i class="fas fa-sync-alt mr-1"></i> Muat Data
                     </button>
                 </div>
+            </div>
+            <div id="note-arsip-absensi" class="hidden p-2.5 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-[11px]">
+                <i class="fas fa-lock mr-1"></i> Mode arsip tahun ajaran <b id="arsip-ta-label">-</b>: data hanya dapat dilihat. Pengisian/pengubahan presensi hanya untuk tahun ajaran aktif.
             </div>
         </div>
 
@@ -77,10 +84,10 @@
                         <p class="text-[11px] text-slate-500">H = Hadir | S = Sakit | I = Izin | A = Alpa (Tanpa Keterangan)</p>
                     </div>
                     <div class="flex gap-2">
-                        <button type="button" onclick="tandaiSemuaHadir()" class="bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs px-3 py-1.5 rounded-lg font-medium transition">
+                        <button type="button" id="btn-tandai-hadir" onclick="tandaiSemuaHadir()" class="bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs px-3 py-1.5 rounded-lg font-medium transition disabled:opacity-50 disabled:cursor-not-allowed">
                             <i class="fas fa-check-double mr-1"></i> Tandai Semua Hadir (H)
                         </button>
-                        <button type="button" id="btn-simpan" onclick="simpanPresensi()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs px-4 py-1.5 rounded-lg font-bold transition shadow">
+                        <button type="button" id="btn-simpan" onclick="simpanPresensi()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs px-4 py-1.5 rounded-lg font-bold transition shadow disabled:opacity-50 disabled:cursor-not-allowed">
                             <i class="fas fa-save mr-1"></i> Simpan Presensi
                         </button>
                     </div>
@@ -111,7 +118,7 @@
                     <div class="flex items-center gap-2 text-xs">
                         <label class="font-bold text-slate-700">Periode Rekap:</label>
                         <select id="rekap-periode" onchange="muatRekapPresensi()" class="p-2 border rounded-lg bg-slate-50 font-medium">
-                            <option value="SEMESTER">Seluruh Semester Aktif</option>
+                            <option value="SEMESTER">Seluruh Semester</option>
                             <option value="01">Januari</option>
                             <option value="02">Februari</option>
                             <option value="03">Maret</option>
@@ -124,6 +131,11 @@
                             <option value="10">Oktober</option>
                             <option value="11">November</option>
                             <option value="12">Desember</option>
+                        </select>
+                        <label class="font-bold text-slate-700 ml-2">Semester:</label>
+                        <select id="rekap-semester" onchange="muatRekapPresensi()" class="p-2 border rounded-lg bg-slate-50 font-medium">
+                            <option value="Ganjil">Ganjil</option>
+                            <option value="Genap">Genap</option>
                         </select>
                     </div>
                     <div class="flex gap-2">
@@ -182,6 +194,7 @@
         let profilSekolah = null;
         let daftarRombel = [];
         let daftarSiswa = [];
+        let daftarTA = [];
 
         function esc(v) {
             return String(v == null ? '' : v)
@@ -234,20 +247,56 @@
             document.getElementById('header-sekolah').innerText = profilSekolah.nama;
             document.getElementById('header-info').innerText = `${profilGuru.nama} | T.A. ${profilSekolah.tahun_ajaran} (${profilSekolah.semester})`;
 
-            // 3. Muat Daftar Rombel sesuai Tahun Ajaran Aktif
+            // 3. Daftar tahun ajaran (dari seluruh rombel + TA aktif sekolah)
+            const { data: taRows } = await sb.from('rombel').select('tahun_ajaran');
+            const setTA = {};
+            (taRows || []).forEach(r => { if (r.tahun_ajaran) setTA[r.tahun_ajaran] = true; });
+            if (profilSekolah.tahun_ajaran) setTA[profilSekolah.tahun_ajaran] = true;
+            daftarTA = Object.keys(setTA).sort();
+            if (daftarTA.length === 0) daftarTA = [profilSekolah.tahun_ajaran];
+
+            const selTA = document.getElementById('filter-ta');
+            selTA.innerHTML = daftarTA.map(ta => `<option value="${esc(ta)}">${esc(ta)}</option>`).join('');
+            selTA.value = profilSekolah.tahun_ajaran;
+            document.getElementById('rekap-semester').value = profilSekolah.semester;
+
+            await muatRombelAbsensi();
+        });
+
+        // Apakah tahun ajaran yang dipilih adalah arsip (bukan TA aktif)?
+        function isArsipAbsensi() {
+            return document.getElementById('filter-ta').value !== (profilSekolah.tahun_ajaran || '');
+        }
+
+        function gantiTAAbsensi() {
+            muatRombelAbsensi();
+        }
+
+        // Muat rombel sesuai tahun ajaran yang dipilih, lalu aktifkan mode
+        // arsip (read-only) bila bukan tahun ajaran aktif.
+        async function muatRombelAbsensi() {
+            const ta = document.getElementById('filter-ta').value;
+            const arsip = isArsipAbsensi();
+            const selRombel = document.getElementById('filter-rombel');
+            const tbody = document.getElementById('tbody-presensi');
+
+            document.getElementById('note-arsip-absensi').classList.toggle('hidden', !arsip);
+            document.getElementById('arsip-ta-label').innerText = ta;
+            document.getElementById('btn-simpan').disabled = arsip;
+            document.getElementById('btn-tandai-hadir').disabled = arsip;
+
             const { data: rombelData } = await sb
                 .from('rombel')
                 .select('*')
-                .eq('tahun_ajaran', profilSekolah.tahun_ajaran)
+                .eq('tahun_ajaran', ta)
                 .order('nama', { ascending: true });
 
             daftarRombel = rombelData || [];
-            const selRombel = document.getElementById('filter-rombel');
             selRombel.innerHTML = '';
 
             if (daftarRombel.length === 0) {
-                selRombel.innerHTML = `<option value="">Belum ada rombel T.A ${esc(profilSekolah.tahun_ajaran)}</option>`;
-                document.getElementById('tbody-presensi').innerHTML = `<tr><td colspan="6" class="text-center p-6 text-slate-400">Admin belum membuat rombel pada Tahun Ajaran ${esc(profilSekolah.tahun_ajaran)}.</td></tr>`;
+                selRombel.innerHTML = `<option value="">Belum ada rombel T.A ${esc(ta)}</option>`;
+                tbody.innerHTML = `<tr><td colspan="6" class="text-center p-6 text-slate-400">Belum ada rombel pada Tahun Ajaran ${esc(ta)}.</td></tr>`;
                 return;
             }
 
@@ -256,7 +305,7 @@
             });
 
             await muatDataPresensi();
-        });
+        }
 
         async function muatDataPresensi() {
             const rombelId = document.getElementById('filter-rombel').value;
@@ -282,7 +331,10 @@
 
             daftarSiswa = (enrData || [])
                 .map(e => e.siswa)
-                .filter(s => s && s.status === 'aktif')
+                .filter(s => s)
+                // Di TA aktif hanya siswa berstatus aktif; di TA arsip tampilkan
+                // seluruh siswa yang pernah terdaftar (termasuk yang sudah lulus/pindah).
+                .filter(s => isArsipAbsensi() ? true : (s.status || 'aktif') === 'aktif')
                 .sort((a, b) => String(a.nama).localeCompare(String(b.nama)));
             if (daftarSiswa.length === 0) {
                 badge.classList.add('hidden');
@@ -353,6 +405,10 @@
         }
 
         function tandaiSemuaHadir() {
+            if (isArsipAbsensi()) {
+                alert('Mode arsip: presensi tahun ajaran lama tidak dapat diubah.');
+                return;
+            }
             daftarSiswa.forEach(s => {
                 const radioH = document.querySelector(`input[name="status-${s.id}"][value="H"]`);
                 if (radioH) radioH.checked = true;
@@ -363,6 +419,11 @@
             const rombelId = document.getElementById('filter-rombel').value;
             const tanggal = document.getElementById('filter-tanggal').value;
             const mapel = document.getElementById('filter-mapel').value.trim();
+
+            if (isArsipAbsensi()) {
+                alert('Mode arsip: presensi tahun ajaran lama hanya dapat dilihat, tidak dapat diubah.');
+                return;
+            }
 
             if (!rombelId || !tanggal || daftarSiswa.length === 0) {
                 alert('Pastikan kelas, tanggal, dan daftar siswa sudah tersedia.');
@@ -428,32 +489,36 @@
 
             const rombelObj = daftarRombel.find(r => r.id === rombelId) || { nama: '-', tingkat: '-' };
             const namaBulan = document.getElementById('rekap-periode').options[document.getElementById('rekap-periode').selectedIndex].text;
+            // Rekap mengikuti Tahun Ajaran & Semester yang dipilih (bisa arsip).
+            const taRekap = document.getElementById('filter-ta').value || profilSekolah.tahun_ajaran;
+            const semesterRekap = document.getElementById('rekap-semester').value || profilSekolah.semester;
 
             // Render KOP & TTD
             document.getElementById('rekap-kop-header').innerHTML = profilSekolah.img_kop
-                ? `<div class="text-center mb-3"><img src="${esc(profilSekolah.img_kop)}" class="kop-img max-h-24 mx-auto object-contain"></div>`
-                : `<div class="text-center border-b-2 border-slate-800 pb-2 mb-3"><h2 class="text-lg font-bold uppercase">${esc(profilSekolah.nama)}</h2><p class="text-[11px]">NPSN: ${esc(profilSekolah.npsn || '-')}</p></div>`;
+                ? `<div class="kop-wrap text-center mb-3"><img src="${esc(profilSekolah.img_kop)}" class="kop-img max-h-24 mx-auto object-contain"></div>`
+                : `<div class="kop-wrap"><div class="kop-text"><h2>${esc(profilSekolah.nama)}</h2><p>NPSN: ${esc(profilSekolah.npsn || '-')}</p></div></div>`;
 
             document.getElementById('rekap-subjudul').innerText =
-                `Kelas: ${rombelObj.nama} (${rombelObj.tingkat}) | Mapel: ${mapel || 'Semua'} | Periode: ${namaBulan} | T.A. ${profilSekolah.tahun_ajaran} (${profilSekolah.semester})`;
+                `Kelas: ${rombelObj.nama} (${rombelObj.tingkat}) | Mapel: ${mapel || 'Semua'} | Periode: ${namaBulan} | T.A. ${taRekap} (${semesterRekap})`;
 
-            const ttdKepsek = profilSekolah.img_ttd ? `<img src="${esc(profilSekolah.img_ttd)}" class="h-14 mx-auto object-contain my-1">` : `<div class="h-12"></div>`;
+            const ttdKepsek = profilSekolah.img_ttd ? `<img src="${esc(profilSekolah.img_ttd)}" class="ttd-img mx-auto" style="height:46pt;width:auto">` : `<div style="height:46pt"></div>`;
             document.getElementById('rekap-ttd-footer').innerHTML = `
-                <div class="grid grid-cols-2 text-center text-xs mt-8 pt-4">
-                    <div>
-                        <p>Mengetahui,</p>
-                        <p class="font-bold">Kepala ${esc(profilSekolah.nama)}</p>
+                <table class="ttd w-full text-center text-xs mt-8"><tr>
+                    <td style="width:50%;border:none;text-align:center;vertical-align:top">
+                        <p style="margin:0">Mengetahui,</p>
+                        <p style="margin:0"><b>Kepala ${esc(profilSekolah.nama)}</b></p>
                         ${ttdKepsek}
-                        <p class="font-bold underline">${esc(profilSekolah.kepsek || '-')}</p>
-                        <p>NIP. ${esc(profilSekolah.nip_kepsek || '-')}</p>
-                    </div>
-                    <div>
-                        <p>Guru Mata Pelajaran,</p>
-                        <div class="h-14"></div>
-                        <p class="font-bold underline">${esc(profilGuru.nama)}</p>
-                        <p>NIP. ${esc(profilGuru.username)}</p>
-                    </div>
-                </div>
+                        <p style="margin:0"><b><u>${esc(profilSekolah.kepsek || '-')}</u></b></p>
+                        <p style="margin:0">NIP. ${esc(profilSekolah.nip_kepsek || '-')}</p>
+                    </td>
+                    <td style="width:50%;border:none;text-align:center;vertical-align:top">
+                        <p style="margin:0">Guru Mata Pelajaran,</p>
+                        <p style="margin:0">&nbsp;</p>
+                        <div style="height:46pt"></div>
+                        <p style="margin:0"><b><u>${esc(profilGuru.nama)}</u></b></p>
+                        <p style="margin:0">NIP. ${esc(profilGuru.username)}</p>
+                    </td>
+                </tr></table>
             `;
 
             // Query data presensi dari Supabase (hanya catatan milik guru ini)
@@ -462,8 +527,8 @@
                 .select('siswa_id, tanggal, status')
                 .eq('rombel_id', rombelId)
                 .eq('guru_id', profilGuru.id)
-                .eq('tahun_ajaran', profilSekolah.tahun_ajaran)
-                .eq('semester', profilSekolah.semester);
+                .eq('tahun_ajaran', taRekap)
+                .eq('semester', semesterRekap);
 
             if (mapel) {
                 query = query.eq('mapel', mapel);
@@ -503,7 +568,7 @@
                 tbody.innerHTML += `
                     <tr>
                         <td class="p-2 border text-center">${idx + 1}</td>
-                        <td class="p-2 border font-mono">${esc(s.nisn)}</td>
+                        <td class="p-2 border font-mono" style="mso-number-format:'\\@'">${esc(s.nisn)}</td>
                         <td class="p-2 border font-medium">${esc(s.nama)}</td>
                         <td class="p-2 border text-center">${esc(s.jk)}</td>
                         <td class="p-2 border text-center font-bold text-emerald-700">${st.H}</td>
@@ -538,11 +603,7 @@
 
         function exportRekapExcel() {
             const html = document.getElementById('area-cetak-rekap').innerHTML;
-            const blob = new Blob(['\ufeff' + html], { type: 'application/vnd.ms-excel' });
-            const a = document.createElement('a');
-            a.href = URL.createObjectURL(blob);
-            a.download = `Rekap_Presensi_${new Date().toISOString().slice(0, 10)}.xls`;
-            a.click();
+            CC.exportExcel(html, `Rekap_Presensi_${new Date().toISOString().slice(0, 10)}`);
         }
 
         function cetakRekap() {

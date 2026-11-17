@@ -693,31 +693,32 @@
         // =========================================================================
         function getKopSuratHTML() {
             return profilSekolah.img_kop
-                ? `<div class="text-center mb-3"><img src="${profilSekolah.img_kop}" class="kop-img max-h-24 mx-auto object-contain"></div>`
-                : `<div class="text-center border-b-2 border-slate-800 pb-2 mb-3">
-                    <h2 class="text-lg font-bold uppercase tracking-wide">${esc(profilSekolah.nama)}</h2>
-                    <p class="text-[11px] text-slate-600">NPSN: ${esc(profilSekolah.npsn || '-')} | Dokumen Asesmen Kurikulum Merdeka</p>
-                   </div>`;
+                ? `<div class="kop-wrap text-center mb-3"><img src="${profilSekolah.img_kop}" class="kop-img max-h-24 mx-auto object-contain"></div>`
+                : `<div class="kop-wrap"><div class="kop-text">
+                    <h2>${esc(profilSekolah.nama)}</h2>
+                    <p>NPSN: ${esc(profilSekolah.npsn || '-')} | Dokumen Asesmen Kurikulum Merdeka</p>
+                   </div></div>`;
         }
 
         function getBlokTTDHTML() {
-            const ttdKepsek = profilSekolah.img_ttd ? `<img src="${profilSekolah.img_ttd}" class="h-14 mx-auto object-contain my-1">` : `<div class="h-12"></div>`;
+            const ttdKepsek = profilSekolah.img_ttd ? `<img src="${profilSekolah.img_ttd}" class="ttd-img mx-auto" style="height:46pt;width:auto">` : `<div style="height:46pt"></div>`;
             return `
-                <div class="grid grid-cols-2 text-center text-xs mt-8 pt-4">
-                    <div>
-                        <p>Mengetahui,</p>
-                        <p class="font-bold">Kepala ${esc(profilSekolah.nama)}</p>
+                <table class="ttd w-full text-center text-xs mt-8"><tr>
+                    <td style="width:50%;border:none;text-align:center;vertical-align:top">
+                        <p style="margin:0">Mengetahui,</p>
+                        <p style="margin:0"><b>Kepala ${esc(profilSekolah.nama)}</b></p>
                         ${ttdKepsek}
-                        <p class="font-bold underline">${esc(profilSekolah.kepsek || '-')}</p>
-                        <p>NIP. ${esc(profilSekolah.nip_kepsek || '-')}</p>
-                    </div>
-                    <div>
-                        <p>Guru Mata Pelajaran,</p>
-                        <div class="h-14"></div>
-                        <p class="font-bold underline">${esc(profilGuru.nama)}</p>
-                        <p>NIP. ${esc(profilGuru.username)}</p>
-                    </div>
-                </div>
+                        <p style="margin:0"><b><u>${esc(profilSekolah.kepsek || '-')}</u></b></p>
+                        <p style="margin:0">NIP. ${esc(profilSekolah.nip_kepsek || '-')}</p>
+                    </td>
+                    <td style="width:50%;border:none;text-align:center;vertical-align:top">
+                        <p style="margin:0">Guru Mata Pelajaran,</p>
+                        <p style="margin:0">&nbsp;</p>
+                        <div style="height:46pt"></div>
+                        <p style="margin:0"><b><u>${esc(profilGuru.nama)}</u></b></p>
+                        <p style="margin:0">NIP. ${esc(profilGuru.username)}</p>
+                    </td>
+                </tr></table>
             `;
         }
 
@@ -790,18 +791,17 @@
             soalPG.forEach((s, idx) => {
                 htmlPG += `
                     <div class="mb-3 break-inside-avoid">
-                        <div class="flex gap-2">
-                            <span class="font-bold w-5">${idx + 1}.</span>
-                            <div class="flex-1">
-                                <p class="mb-1.5 whitespace-pre-line">${esc(s.pertanyaan)}</p>
-                                <div class="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-1 pl-1">
-                                    <div><b>A.</b> ${esc(s.opsi_a)}</div>
-                                    <div><b>C.</b> ${esc(s.opsi_c)}</div>
-                                    <div><b>B.</b> ${esc(s.opsi_b)}</div>
-                                    <div><b>D.</b> ${esc(s.opsi_d)}</div>
-                                </div>
-                            </div>
-                        </div>
+                        <p style="margin:0 0 3pt;white-space:pre-line"><b>${idx + 1}.</b> ${esc(s.pertanyaan)}</p>
+                        <table class="plain w-full">
+                            <tr>
+                                <td style="width:50%;border:none"><b>A.</b> ${esc(s.opsi_a)}</td>
+                                <td style="width:50%;border:none"><b>C.</b> ${esc(s.opsi_c)}</td>
+                            </tr>
+                            <tr>
+                                <td style="border:none"><b>B.</b> ${esc(s.opsi_b)}</td>
+                                <td style="border:none"><b>D.</b> ${esc(s.opsi_d)}</td>
+                            </tr>
+                        </table>
                     </div>
                 `;
             });
@@ -810,10 +810,7 @@
             soalUraian.forEach((s, idx) => {
                 htmlUraian += `
                     <div class="mb-3 break-inside-avoid">
-                        <div class="flex gap-2">
-                            <span class="font-bold w-5">${idx + 1}.</span>
-                            <div class="flex-1 whitespace-pre-line">${esc(s.pertanyaan)}</div>
-                        </div>
+                        <p style="margin:0;white-space:pre-line"><b>${idx + 1}.</b> ${esc(s.pertanyaan)}</p>
                     </div>
                 `;
             });
@@ -958,21 +955,13 @@
         }
 
         function exportWord(elemId, filename) {
-            const html = "<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'><head><meta charset='utf-8'></head><body>" + document.getElementById(elemId).innerHTML + "</body></html>";
-            const blob = new Blob(['\ufeff', html], { type: 'application/msword' });
-            const a = document.createElement('a');
-            a.href = URL.createObjectURL(blob);
-            a.download = `${filename}_${new Date().toISOString().slice(0, 10)}.doc`;
-            a.click();
+            CC.exportWord(document.getElementById(elemId).innerHTML,
+                `${filename}_${new Date().toISOString().slice(0, 10)}`);
         }
 
         function exportExcel(elemId, filename) {
-            const html = document.getElementById(elemId).innerHTML;
-            const blob = new Blob(['\ufeff' + html], { type: 'application/vnd.ms-excel' });
-            const a = document.createElement('a');
-            a.href = URL.createObjectURL(blob);
-            a.download = `${filename}_${new Date().toISOString().slice(0, 10)}.xls`;
-            a.click();
+            CC.exportExcel(document.getElementById(elemId).innerHTML,
+                `${filename}_${new Date().toISOString().slice(0, 10)}`);
         }
 
         function cetakDokumen(elemId, judul) {

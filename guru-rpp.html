@@ -401,34 +401,37 @@ Peserta didik mampu menginisiasi kegiatan bersama dalam merawat keberagaman suku
 
         // Helper KOP Surat
         function dapatkanKOPHeader() {
-            return dbSekolah.imgKop 
-                ? `<div class="text-center mb-4"><img src="${dbSekolah.imgKop}" class="kop-img max-h-24 mx-auto object-contain"></div>`
-                : `<div class="text-center border-b-2 border-slate-800 pb-2 mb-4">
-                    <h2 class="text-lg font-bold uppercase tracking-wide">${escapeHtml(dbSekolah.nama)}</h2>
-                    <p class="text-[11px] text-slate-600">NPSN: ${escapeHtml(dbSekolah.npsn || '-')} | Perangkat Kurikulum Merdeka SMP Negeri</p>
-                   </div>`;
+            return dbSekolah.imgKop
+                ? `<div class="kop-wrap text-center mb-4"><img src="${dbSekolah.imgKop}" class="kop-img max-h-24 mx-auto object-contain"></div>`
+                : `<div class="kop-wrap"><div class="kop-text">
+                    <h2>${escapeHtml(dbSekolah.nama)}</h2>
+                    <p>NPSN: ${escapeHtml(dbSekolah.npsn || '-')} | Perangkat Kurikulum Merdeka SMP</p>
+                   </div></div>`;
         }
 
-        // Helper Legalisasi TTD
+        // Helper Legalisasi TTD (tabel 2 kolom agar rapi juga di Word)
         function dapatkanBlockTTD() {
-            let ttdKepsekImg = dbSekolah.imgTtd ? `<img src="${dbSekolah.imgTtd}" class="h-14 mx-auto object-contain my-1">` : `<div class="h-12"></div>`;
+            const ttdKepsekImg = dbSekolah.imgTtd
+                ? `<img src="${dbSekolah.imgTtd}" class="ttd-img mx-auto" style="height:46pt;width:auto">`
+                : `<div style="height:46pt"></div>`;
 
             return `
-                <div class="grid grid-cols-2 text-center text-xs mt-8 pt-4 border-t">
-                    <div>
-                        <p>Mengetahui,</p>
-                        <p class="font-bold">Kepala ${escapeHtml(dbSekolah.nama)}</p>
+                <table class="ttd w-full text-center text-xs mt-8"><tr>
+                    <td style="width:50%;border:none;text-align:center;vertical-align:top">
+                        <p style="margin:0">Mengetahui,</p>
+                        <p style="margin:0"><b>Kepala ${escapeHtml(dbSekolah.nama)}</b></p>
                         ${ttdKepsekImg}
-                        <p class="font-bold underline">${escapeHtml(dbSekolah.kepsek || '-')}</p>
-                        <p>NIP. ${escapeHtml(dbSekolah.nipKepsek || '-')}</p>
-                    </div>
-                    <div>
-                        <p>Guru Mata Pelajaran,</p>
-                        <div class="h-14"></div>
-                        <p class="font-bold underline">${escapeHtml(session.nama)}</p>
-                        <p>NIP. ${escapeHtml(session.username)}</p>
-                    </div>
-                </div>
+                        <p style="margin:0"><b><u>${escapeHtml(dbSekolah.kepsek || '-')}</u></b></p>
+                        <p style="margin:0">NIP. ${escapeHtml(dbSekolah.nipKepsek || '-')}</p>
+                    </td>
+                    <td style="width:50%;border:none;text-align:center;vertical-align:top">
+                        <p style="margin:0">Guru Mata Pelajaran,</p>
+                        <p style="margin:0">&nbsp;</p>
+                        <div style="height:46pt"></div>
+                        <p style="margin:0"><b><u>${escapeHtml(session.nama)}</u></b></p>
+                        <p style="margin:0">NIP. ${escapeHtml(session.username)}</p>
+                    </td>
+                </tr></table>
             `;
         }
 
@@ -458,14 +461,7 @@ Peserta didik mampu menginisiasi kegiatan bersama dalam merawat keberagaman suku
         }
 
         function exportDoc(elemId, filename = 'Dokumen_Perangkat_Ajar') {
-            const html = "<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'><head><meta charset='utf-8'></head><body>" + document.getElementById(elemId).innerHTML + "</body></html>";
-            const blob = new Blob(['\ufeff', html], { type: 'application/msword' });
-            const a = document.createElement('a');
-            a.href = URL.createObjectURL(blob);
-            a.download = filename + '.doc';
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
+            CC.exportWord(document.getElementById(elemId).innerHTML, filename);
         }
 
         function logout() {

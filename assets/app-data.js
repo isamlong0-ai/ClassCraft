@@ -541,39 +541,116 @@
         return ringkas;
     }
 
-    // ---------- Cetak dokumen (format F4 215x330 mm) ----------
-    // Membuka jendela cetak berisi HTML dari elemen tertentu, dengan ukuran
-    // kertas F4 dan gaya kop yang proporsional. Dipakai semua modul cetak
-    // (ATP/RPP, Bank Soal, Rekap Presensi, Jurnal Mengajar).
+    // ---------- Dokumen: gaya dasar, cetak, ekspor Word/Excel ----------
+    // Word & Excel mengabaikan kelas Tailwind, jadi dokumen memakai CSS
+    // level-elemen agar judul, paragraf, dan tabel tetap rapi saat dicetak
+    // maupun diekspor. Kertas selalu F4 (215 x 330 mm).
+    function docBaseCss() {
+        return [
+            'body { font-family: "Times New Roman", Times, serif; font-size: 11pt; color: #000; margin: 0; padding: 0; }',
+            'h1, h2, h3, h4, h5 { text-align: center; font-weight: bold; margin: 0 0 4pt; line-height: 1.3; }',
+            'p { margin: 0 0 5pt; text-align: justify; }',
+            'table { border-collapse: collapse; width: 100%; }',
+            'th, td { vertical-align: top; }',
+            'table.border, table.border th, table.border td, table[border] th, table[border] td { border: 1px solid #000; }',
+            'table.border th, table[border] th { background: #eef2ff; text-align: center; }',
+            'table.ttd, table.ttd td { border: none; text-align: center; padding: 2pt 6pt; }',
+            'table.plain, table.plain td { border: none; }',
+            '.text-center, .text-center p, .text-center h1, .text-center h2, .text-center h3, .text-center h4 { text-align: center; }',
+            '.text-right, .text-right p { text-align: right; }',
+            '.font-bold, .font-semibold { font-weight: bold; }',
+            '.underline { text-decoration: underline; }',
+            '.uppercase { text-transform: uppercase; }',
+            '.kop-wrap { text-align: center; margin: 0 0 6pt; }',
+            '.kop-wrap img { display: block; width: 100%; height: auto; max-height: none; }',
+            '.kop-text { text-align: center; border-bottom: 3px double #000; padding-bottom: 6pt; margin-bottom: 8pt; }',
+            '.kop-text h2 { font-size: 16pt; margin: 0; text-transform: uppercase; }',
+            '.kop-text p { font-size: 10pt; margin: 2pt 0 0; text-align: center; }',
+            'img.kop-img { width: 100%; height: auto; max-height: none; }',
+            'img.ttd-img { height: 46pt; width: auto; }',
+            '.break-inside-avoid { page-break-inside: avoid; }'
+        ].join('\n');
+    }
+
+    // Cetak dokumen F4: kop full-bleed (tanpa margin kiri-kanan, menempel di
+    // atas) dan tinggi mengikuti rasio gambar asli.
     function printArea(elemId, judul) {
         var el = document.getElementById(elemId);
         if (!el) { alert('Area cetak tidak ditemukan.'); return; }
-        var win = window.open('', '', 'height=680,width=920');
+        var win = window.open('', '', 'height=720,width=960');
         if (!win) {
             alert('Jendela cetak diblokir browser. Izinkan popup untuk situs ini lalu coba lagi.');
             return;
         }
-        var head = [
-            '<!DOCTYPE html><html lang="id"><head><meta charset="UTF-8">',
-            '<title>' + (judul || 'Cetak Dokumen') + '</title>',
-            '<script src="https://cdn.tailwindcss.com"><\/script>',
-            '<style>',
-            '@page { size: 215mm 330mm; margin: 12mm; }',
+        var css = [
+            '@page { size: 215mm 330mm; margin: 0; }',
             'html, body { margin: 0; padding: 0; background: #fff; }',
-            'body { font-family: Arial, Helvetica, sans-serif; color: #000; }',
-            '@media screen { body { width: 191mm; margin: 0 auto; padding: 6mm 0; } }',
-            '.kop-img { width: 100%; height: auto; object-fit: contain; }',
-            'img.kop-img { width: 100%; height: auto; max-height: 32mm; object-fit: contain; }',
-            'table { border-collapse: collapse; }',
-            '</style>',
-            '</head><body>'
-        ].join('');
+            docBaseCss(),
+            '.doc { padding: 12mm 12mm 14mm; }',
+            '.doc .kop-wrap { margin: -12mm -12mm 6pt; }',
+            '@media screen { body { background: #e5e7eb; } .doc { width: 215mm; min-height: 297mm; margin: 0 auto; background: #fff; box-shadow: 0 0 10px rgba(0,0,0,.25); } }'
+        ].join('\n');
+        var head = '<!DOCTYPE html><html lang="id"><head><meta charset="UTF-8">' +
+            '<title>' + (judul || 'Cetak Dokumen') + '</title>' +
+            '<script src="https://cdn.tailwindcss.com"><\/script>' +
+            '<style>' + css + '</style></head><body>';
         win.document.write(head);
-        win.document.write(el.innerHTML);
+        win.document.write('<div class="doc">' + el.innerHTML + '</div>');
         win.document.write('</body></html>');
         win.document.close();
         // Beri waktu Tailwind CDN memproses kelas sebelum mencetak.
-        setTimeout(function () { try { win.focus(); win.print(); } catch (e) {} }, 800);
+        setTimeout(function () { try { win.focus(); win.print(); } catch (e) {} }, 900);
+    }
+
+    // Ekspor Word (.doc) berformat F4 dengan kop full-bleed, judul, paragraf,
+    // dan tabel yang sudah distyling level-elemen (tidak bergantung Tailwind).
+    function exportWord(contentHTML, filename) {
+        var css = [
+            '@page WordSection1 { size: 215mm 330mm; margin: 0; }',
+            'div.WordSection1 { page: WordSection1; padding: 12mm 12mm 14mm; }',
+            'div.WordSection1 .kop-wrap { margin: -12mm -12mm 6pt; }',
+            docBaseCss()
+        ].join('\n');
+        var html = "<html xmlns:o='urn:schemas-microsoft-com:office:office' " +
+            "xmlns:w='urn:schemas-microsoft-com:office:word' " +
+            "xmlns='http://www.w3.org/TR/REC-html40'><head><meta charset='utf-8'>" +
+            '<title>' + (filename || 'Dokumen') + '</title>' +
+            '<style>' + css + '</style></head><body>' +
+            "<div class='WordSection1'>" + (contentHTML || '') + '</div></body></html>';
+        var blob = new Blob(['\ufeff', html], { type: 'application/msword' });
+        var a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = (filename || 'Dokumen') + '.doc';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+    }
+
+    // Ekspor Excel (.xls) dari HTML dokumen. Tabel ber-border tetap rapi dan
+    // kop ikut disertakan. Ukuran kertas tetap F4.
+    function exportExcel(contentHTML, filename) {
+        var css = [
+            '@page { size: 215mm 330mm; margin: 10mm; }',
+            docBaseCss(),
+            'body { font-size: 10pt; }',
+            'td, th { padding: 3pt 5pt; }'
+        ].join('\n');
+        var excelHead = "<!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets>" +
+            '<x:ExcelWorksheet><x:Name>Laporan</x:Name><x:WorksheetOptions>' +
+            "<x:PageSetup><x:Layout x:Orientation='Portrait'/></x:PageSetup>" +
+            '</x:WorksheetOptions></x:ExcelWorksheet></x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]-->';
+        var html = "<html xmlns:o='urn:schemas-microsoft-com:office:office' " +
+            "xmlns:x='urn:schemas-microsoft-com:office:excel' " +
+            "xmlns='http://www.w3.org/TR/REC-html40'><head><meta charset='utf-8'>" +
+            '<title>' + (filename || 'Data') + '</title>' + excelHead +
+            '<style>' + css + '</style></head><body>' + (contentHTML || '') + '</body></html>';
+        var blob = new Blob(['\ufeff', html], { type: 'application/vnd.ms-excel' });
+        var a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = (filename || 'Data') + '.xls';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
     }
 
     // ---------- Backup / Restore ----------
@@ -648,6 +725,8 @@
         tahunAjaranBerikutnya: tahunAjaranBerikutnya,
         semesterSaatIni: semesterSaatIni,
         printArea: printArea,
+        exportWord: exportWord,
+        exportExcel: exportExcel,
         exportAll: exportAll,
         restoreAll: restoreAll,
         defaults: { users: DEFAULT_USERS, sekolah: DEFAULT_SEKOLAH, rombel: DEFAULT_ROMBEL }

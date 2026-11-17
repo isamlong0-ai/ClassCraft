@@ -573,8 +573,8 @@
 
             // Header KOP
             document.getElementById('lap-kop-header').innerHTML = profilSekolah.img_kop
-                ? `<div class="text-center mb-3"><img src="${esc(profilSekolah.img_kop)}" class="kop-img max-h-24 mx-auto object-contain"></div>`
-                : `<div class="text-center border-b-2 border-slate-800 pb-2 mb-3"><h2 class="text-lg font-bold uppercase">${esc(profilSekolah.nama)}</h2><p class="text-[11px]">NPSN: ${esc(profilSekolah.npsn || '-')}</p></div>`;
+                ? `<div class="kop-wrap text-center mb-3"><img src="${esc(profilSekolah.img_kop)}" class="kop-img max-h-24 mx-auto object-contain"></div>`
+                : `<div class="kop-wrap"><div class="kop-text"><h2>${esc(profilSekolah.nama)}</h2><p>NPSN: ${esc(profilSekolah.npsn || '-')}</p></div></div>`;
 
             document.getElementById('lap-subjudul').innerText = `Periode: ${namaPeriode} | Tahun Pelajaran ${profilSekolah.tahun_ajaran}`;
 
@@ -622,24 +622,25 @@
                 });
             }
 
-            // Blok Legalisasi TTD Kepala Sekolah & Guru
-            const ttdKepsek = profilSekolah.img_ttd ? `<img src="${esc(profilSekolah.img_ttd)}" class="h-14 mx-auto object-contain my-1">` : `<div class="h-12"></div>`;
+            // Blok Legalisasi TTD Kepala Sekolah & Guru (tabel 2 kolom agar rapi di Word)
+            const ttdKepsek = profilSekolah.img_ttd ? `<img src="${esc(profilSekolah.img_ttd)}" class="ttd-img mx-auto" style="height:46pt;width:auto">` : `<div style="height:46pt"></div>`;
             document.getElementById('lap-ttd-footer').innerHTML = `
-                <div class="grid grid-cols-2 text-center text-xs mt-8 pt-4">
-                    <div>
-                        <p>Mengetahui,</p>
-                        <p class="font-bold">Kepala ${esc(profilSekolah.nama)}</p>
+                <table class="ttd w-full text-center text-xs mt-8"><tr>
+                    <td style="width:50%;border:none;text-align:center;vertical-align:top">
+                        <p style="margin:0">Mengetahui,</p>
+                        <p style="margin:0"><b>Kepala ${esc(profilSekolah.nama)}</b></p>
                         ${ttdKepsek}
-                        <p class="font-bold underline">${esc(profilSekolah.kepsek || '-')}</p>
-                        <p>NIP. ${esc(profilSekolah.nip_kepsek || '-')}</p>
-                    </div>
-                    <div>
-                        <p>Guru Mata Pelajaran,</p>
-                        <div class="h-14"></div>
-                        <p class="font-bold underline">${esc(profilGuru.nama)}</p>
-                        <p>NIP. ${esc(profilGuru.username)}</p>
-                    </div>
-                </div>
+                        <p style="margin:0"><b><u>${esc(profilSekolah.kepsek || '-')}</u></b></p>
+                        <p style="margin:0">NIP. ${esc(profilSekolah.nip_kepsek || '-')}</p>
+                    </td>
+                    <td style="width:50%;border:none;text-align:center;vertical-align:top">
+                        <p style="margin:0">Guru Mata Pelajaran,</p>
+                        <p style="margin:0">&nbsp;</p>
+                        <div style="height:46pt"></div>
+                        <p style="margin:0"><b><u>${esc(profilGuru.nama)}</u></b></p>
+                        <p style="margin:0">NIP. ${esc(profilGuru.username)}</p>
+                    </td>
+                </tr></table>
             `;
         }
 
@@ -664,21 +665,13 @@
         }
 
         function exportLaporanWord() {
-            const html = "<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'><head><meta charset='utf-8'></head><body>" + document.getElementById('area-cetak-jurnal').innerHTML + "</body></html>";
-            const blob = new Blob(['\ufeff', html], { type: 'application/msword' });
-            const a = document.createElement('a');
-            a.href = URL.createObjectURL(blob);
-            a.download = `Jurnal_Mengajar_${new Date().toISOString().slice(0, 10)}.doc`;
-            a.click();
+            CC.exportWord(document.getElementById('area-cetak-jurnal').innerHTML,
+                `Jurnal_Mengajar_${new Date().toISOString().slice(0, 10)}`);
         }
 
         function exportLaporanExcel() {
-            const html = document.getElementById('area-cetak-jurnal').innerHTML;
-            const blob = new Blob(['\ufeff' + html], { type: 'application/vnd.ms-excel' });
-            const a = document.createElement('a');
-            a.href = URL.createObjectURL(blob);
-            a.download = `Jurnal_Mengajar_${new Date().toISOString().slice(0, 10)}.xls`;
-            a.click();
+            CC.exportExcel(document.getElementById('area-cetak-jurnal').innerHTML,
+                `Jurnal_Mengajar_${new Date().toISOString().slice(0, 10)}`);
         }
 
         function cetakLaporan() {

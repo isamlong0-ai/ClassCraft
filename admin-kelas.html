@@ -437,8 +437,33 @@
             if (!rombel) return;
             const hanyaAktif = document.getElementById('filter-aktif').checked;
             const daftar = hanyaAktif ? rombel.siswa.filter(s => (s.status || 'aktif') === 'aktif') : rombel.siswa;
-            let table = `<table border="1"><tr><th colspan="7">DAFTAR SISWA KELAS ${escapeHtml(rombel.nama)}${rombel.tahun_ajaran ? ' — ' + escapeHtml(rombel.tahun_ajaran) : ''}</th></tr><tr><th>No</th><th>NISN</th><th>NIPD</th><th>Nama</th><th>JK</th><th>Status</th><th>Keterangan</th></tr>`;
-            daftar.forEach((s, idx) => { table += `<tr><td>${idx+1}</td><td>'${escapeHtml(s.nisn)}</td><td>${escapeHtml(s.nipd || '-')}</td><td>${escapeHtml(s.nama)}</td><td>${escapeHtml(s.jk)}</td><td>${STATUS_LABEL[s.status] || 'Aktif'}</td><td>${escapeHtml(s.keterangan || '')}</td></tr>`; }); table += `</table>`; const blob = new Blob(['\ufeff' + table], { type: 'application/vnd.ms-excel' }); const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `Siswa_${rombel.nama}.xls`; a.click();
+
+            const kop = dbSekolah.imgKop
+                ? `<div class="kop-wrap text-center"><img src="${dbSekolah.imgKop}" class="kop-img"></div>`
+                : `<div class="kop-wrap"><div class="kop-text"><h2>${escapeHtml(dbSekolah.nama)}</h2><p>NPSN: ${escapeHtml(dbSekolah.npsn || '-')}</p></div></div>`;
+
+            let rows = '';
+            daftar.forEach((s, idx) => {
+                rows += `<tr>
+                    <td>${idx + 1}</td>
+                    <td style="mso-number-format:'\\@'">${escapeHtml(s.nisn)}</td>
+                    <td style="mso-number-format:'\\@'">${escapeHtml(s.nipd || '-')}</td>
+                    <td>${escapeHtml(s.nama)}</td>
+                    <td>${escapeHtml(s.jk)}</td>
+                    <td>${STATUS_LABEL[s.status] || 'Aktif'}</td>
+                    <td>${escapeHtml(s.keterangan || '')}</td>
+                </tr>`;
+            });
+
+            const content = `
+                ${kop}
+                <h3>DAFTAR SISWA KELAS ${escapeHtml(rombel.nama)}${rombel.tahun_ajaran ? ' — ' + escapeHtml(rombel.tahun_ajaran) : ''}</h3>
+                <table class="border">
+                    <thead><tr><th>No</th><th>NISN</th><th>NIPD</th><th>Nama</th><th>JK</th><th>Status</th><th>Keterangan</th></tr></thead>
+                    <tbody>${rows}</tbody>
+                </table>
+            `;
+            CC.exportExcel(content, `Siswa_${rombel.nama}`);
         }
 
         // ---------- Wizard kenaikan kelas ----------
