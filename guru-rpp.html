@@ -128,7 +128,7 @@
             <!-- Tampilan Tab ATP -->
             <div id="tab-content-atp" class="bg-white p-6 rounded-b-xl shadow-md border border-slate-200 space-y-4">
                 <div class="flex justify-between items-center border-b pb-3">
-                    <h3 class="font-bold text-slate-800 text-sm"><i class="fas fa-table mr-2 text-indigo-600"></i>Dokumen Alur Tujuan Pembelajaran (ATP) - Fase D</h3>
+                    <h3 class="font-bold text-slate-800 text-sm"><i class="fas fa-table mr-2 text-indigo-600"></i>Dokumen Alur Tujuan Pembelajaran (ATP)</h3>
                     <div class="flex gap-2">
                         <button onclick="exportDoc('isi-atp', 'ATP_Lengkap')" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs px-3 py-1.5 rounded-lg transition font-medium"><i class="fas fa-file-word mr-1"></i>Ekspor ATP (Word)</button>
                         <button onclick="cetakArea('isi-atp')" class="bg-slate-700 hover:bg-slate-800 text-white text-xs px-3 py-1.5 rounded-lg transition font-medium"><i class="fas fa-print mr-1"></i>Cetak ATP</button>
@@ -351,7 +351,7 @@ Peserta didik mampu menginisiasi kegiatan bersama dalam merawat keberagaman suku
                 ${kopHtml}
                 <div class="text-center font-bold mb-4">
                     <h2 class="text-sm uppercase text-indigo-900">ALUR TUJUAN PEMBELAJARAN (ATP) KURIKULUM MERDEKA</h2>
-                    <p class="text-xs font-normal">Mata Pelajaran: <b>${escapeHtml(session.mapel)}</b> | Fase D (${escapeHtml(rombel.tingkat)}) | ${escapeHtml(semester)}</p>
+                    <p class="text-xs font-normal">Mata Pelajaran: <b>${escapeHtml(session.mapel)}</b> | ${escapeHtml(rombel.tingkat)} | ${escapeHtml(semester)}</p>
                 </div>
 
                 <table class="w-full text-xs border-collapse border border-slate-300 mb-4">

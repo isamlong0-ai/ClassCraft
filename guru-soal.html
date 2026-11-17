@@ -133,6 +133,7 @@
 
                 <div id="gen-panel-rpp" class="hidden space-y-2">
                     <div class="text-[11px] text-slate-600">Pilih elemen/TP yang akan dijadikan acuan soal:</div>
+                    <textarea id="gen-cp-preview" rows="4" readonly class="w-full p-2.5 border rounded-lg bg-slate-50 text-xs font-mono" placeholder="CP tersimpan akan tampil di sini..."></textarea>
                     <div id="gen-tp-list" class="max-h-40 overflow-y-auto border rounded-lg bg-white p-2 space-y-1"></div>
                 </div>
 
@@ -174,7 +175,35 @@
                 </div>
             </div>
 
-                <!-- Form Tambah / Edit Butir Soal -->
+                <!-- AI (opsional) -->
+            <details class="border border-indigo-200 rounded-lg p-3 bg-white/60">
+                <summary class="cursor-pointer font-bold text-indigo-800 text-xs"><i class="fas fa-robot mr-1"></i> Generate dengan AI (opsional — kualitas soal lebih baik)</summary>
+                <div class="mt-2 space-y-2 text-xs">
+                    <p class="text-[10px] text-amber-700 bg-amber-50 border border-amber-200 rounded p-2">
+                        <i class="fas fa-exclamation-triangle mr-1"></i> API key disimpan di browser (localStorage). Gunakan hanya untuk keperluan pribadi.
+                    </p>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-2">
+                        <div>
+                            <label class="block font-semibold text-slate-700 mb-1">Provider</label>
+                            <select id="ai-provider" class="w-full p-2 border rounded-lg bg-white">
+                                <option value="openai">OpenAI (gpt-4o-mini)</option>
+                            </select>
+                        </div>
+                        <div class="md:col-span-2">
+                            <label class="block font-semibold text-slate-700 mb-1">API Key</label>
+                            <input type="password" id="ai-key" placeholder="sk-..." class="w-full p-2 border rounded-lg bg-white">
+                        </div>
+                    </div>
+                    <button type="button" onclick="simpanAiKey()" class="bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs px-3 py-1.5 rounded-lg font-medium transition">
+                        <i class="fas fa-save mr-1"></i> Simpan Key
+                    </button>
+                    <button type="button" onclick="generateSoalAI()" class="bg-purple-600 hover:bg-purple-700 text-white text-xs px-4 py-2 rounded-lg font-bold transition shadow">
+                        <i class="fas fa-robot mr-1"></i> Generate dengan AI
+                    </button>
+                </div>
+            </details>
+
+            <!-- Form Tambah / Edit Butir Soal -->
                 <div class="bg-slate-50 p-5 rounded-xl border border-slate-200 space-y-4 text-xs">
                     <div class="flex justify-between items-center border-b pb-2">
                         <h3 class="font-bold text-slate-800" id="judul-form-soal">
@@ -373,11 +402,11 @@
                             </select>
                         </div>
                         <div>
-                            <label class="block font-semibold text-slate-700 mb-1">Tingkat / Fase</label>
+                            <label class="block font-semibold text-slate-700 mb-1">Tingkat / Kelas</label>
                             <select id="meta-tingkat" class="w-full p-2 border rounded-lg bg-white">
-                                <option value="Kelas 7">Kelas 7 (Fase D)</option>
-                                <option value="Kelas 8">Kelas 8 (Fase D)</option>
-                                <option value="Kelas 9">Kelas 9 (Fase D)</option>
+                                <option value="Kelas 7">Kelas 7</option>
+                                <option value="Kelas 8">Kelas 8</option>
+                                <option value="Kelas 9">Kelas 9</option>
                             </select>
                         </div>
                         <div>
@@ -1100,8 +1129,8 @@
                         <td class="p-1.5 border border-slate-800">: ................................................</td>
                     </tr>
                     <tr>
-                        <td class="p-1.5 border border-slate-800 font-semibold">Kelas / Fase</td>
-                        <td class="p-1.5 border border-slate-800">: ${esc(tingkat)} / Fase D</td>
+                        <td class="p-1.5 border border-slate-800 font-semibold">Kelas</td>
+                        <td class="p-1.5 border border-slate-800">: ${esc(tingkat)}</td>
                         <td class="p-1.5 border border-slate-800 font-semibold">Kelas / No. Absen</td>
                         <td class="p-1.5 border border-slate-800">: .................... / ......................</td>
                     </tr>
@@ -1174,7 +1203,7 @@
                 <table class="w-full text-xs mb-3">
                     <tr>
                         <td class="w-36 font-semibold py-0.5">Satuan Pendidikan</td><td class="w-3">:</td><td>${esc(profilSekolah.nama)}</td>
-                        <td class="w-32 font-semibold py-0.5">Kelas / Fase</td><td class="w-3">:</td><td>${esc(tingkat)} / Fase D</td>
+                        <td class="w-32 font-semibold py-0.5">Kelas</td><td class="w-3">:</td><td>${esc(tingkat)}</td>
                     </tr>
                     <tr>
                         <td class="font-semibold py-0.5">Mata Pelajaran</td><td>:</td><td>${esc(mapel)}</td>
@@ -1542,6 +1571,7 @@
                 panelCp.classList.remove('hidden');
                 panelRpp.classList.add('hidden');
                 genTPs = [];
+                document.getElementById('gen-cp-preview').value = '';
             } else {
                 panelCp.classList.add('hidden');
                 panelRpp.classList.remove('hidden');
@@ -1549,6 +1579,7 @@
                 const tps = [];
                 if (rpp) {
                     const konten = rpp.konten || {};
+                    document.getElementById('gen-cp-preview').value = konten.rawCP || '(CP tidak tersimpan)';
                     (konten.listElemen || []).forEach(el => {
                         (el.tpList || []).forEach(tp => { tps.push(Object.assign({}, tp, { _elemen: el.nama })); });
                     });
@@ -2026,6 +2057,69 @@
             result.push(cur);
             return result;
         }
+
+        function simpanAiKey() {
+            const key = (document.getElementById('ai-key').value || '').trim();
+            if (key) {
+                localStorage.setItem('cc_ai_key', key);
+                alert('API key disimpan di browser.');
+            } else {
+                localStorage.removeItem('cc_ai_key');
+                alert('API key dihapus.');
+            }
+        }
+
+        async function generateSoalAI() {
+            const key = localStorage.getItem('cc_ai_key');
+            if (!key) { alert('Masukkan dan simpan API key terlebih dahulu.'); return; }
+            const checked = Array.from(document.querySelectorAll('.gen-tp-check:checked')).map(c => genTPs[parseInt(c.dataset.idx, 10)]);
+            const tps = checked.length ? checked : genTPs;
+            if (!tps.length) { alert('Tidak ada TP. Analisis CP atau pilih RPP terlebih dahulu.'); return; }
+            const jumlah = Math.max(1, parseInt(document.getElementById('gen-jumlah').value, 10) || 10);
+            const bentukOpt = document.getElementById('gen-bentuk').value;
+            const tpText = tps.map(t => `- ${t.kode} (${t._elemen}): ${t.deskripsi}`).join('\n');
+            const prompt = `Anda adalah guru pembuat soal. Buat ${jumlah} soal dari daftar Tujuan Pembelajaran berikut:\n${tpText}\n\nBentuk soal: ${bentukOpt === 'campuran' ? 'campuran PG dan Uraian' : bentukOpt}.\nKembalikan HANYA array JSON (tanpa penjelasan) dengan ${jumlah} objek, masing-masing berisi field:\n{"tipe":"PG" atau "URAIAN","kesulitan":"mudah/menengah/sulit","skor":angka,"tp_materi":"kode TP + elemen","indikator":"indikator soal","pertanyaan":"teks soal","opsi_a":"","opsi_b":"","opsi_c":"","opsi_d":"","kunci":"A/B/C/D atau rubrik uraian"}\nUntuk PG sertakan 4 opsi (A-D) dan kunci huruf. Untuk Uraian, opsi kosong dan kunci berisi rubrik.\nPastikan soal bervariasi, substantif, dan sesuai materi.`;
+
+            const btn = event && event.target;
+            try {
+                const res = await fetch('https://api.openai.com/v1/chat/completions', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + key },
+                    body: JSON.stringify({ model: 'gpt-4o-mini', messages: [{ role: 'user', content: prompt }], temperature: 0.7 })
+                });
+                if (!res.ok) { alert('Gagal memanggil AI: ' + res.status + ' ' + res.statusText); return; }
+                const data = await res.json();
+                const content = data.choices && data.choices[0] && data.choices[0].message ? data.choices[0].message.content : '';
+                const m = content.match(/\[[\s\S]*\]/);
+                if (!m) { alert('Respons AI tidak berisi JSON array.'); return; }
+                const items = JSON.parse(m[0]);
+                genPreview = items.map(it => ({
+                    tipe: (it.tipe || 'PG').toUpperCase() === 'URAIAN' ? 'URAIAN' : 'PG',
+                    level: (it.kesulitan === 'mudah') ? 'L1 (LotS - Pengetahuan/Pemahaman)' : (it.kesulitan === 'sulit') ? 'L3 (HotS - Penalaran/Analisis)' : 'L2 (MotS - Penerapan)',
+                    kesulitan: (it.kesulitan || 'menengah').toLowerCase(),
+                    skor: parseInt(it.skor, 10) || 2,
+                    tp_materi: it.tp_materi || '',
+                    indikator: it.indikator || '',
+                    pertanyaan: it.pertanyaan || '',
+                    opsi_a: it.opsi_a || '', opsi_b: it.opsi_b || '', opsi_c: it.opsi_c || '', opsi_d: it.opsi_d || '',
+                    kunci: it.kunci || (it.tipe === 'URAIAN' ? '' : 'A'),
+                    stimulus: '', tags: []
+                }));
+                // render preview
+                const box = document.getElementById('gen-preview');
+                box.innerHTML = '';
+                genPreview.forEach((s, i) => {
+                    box.innerHTML += `<div class="border rounded p-2"><b>${i + 1}.</b> [${esc(s.tipe)}][${esc(s.kesulitan)}] ${esc(s.pertanyaan)}${s.tipe === 'PG' ? `<br><span class="text-slate-500">A. ${esc(s.opsi_a)} B. ${esc(s.opsi_b)} C. ${esc(s.opsi_c)} D. ${esc(s.opsi_d)} (Kunci: ${esc(s.kunci)})</span>` : `<br><span class="text-slate-500">Kunci: ${esc((s.kunci || '').slice(0, 80))}</span>`}</div>`;
+                });
+                document.getElementById('gen-preview-count').innerText = genPreview.length;
+                document.getElementById('gen-preview-wrap').classList.remove('hidden');
+            } catch (e) {
+                alert('Error: ' + e.message);
+            }
+        }
+
+        // load saved key
+        (function(){ const k = localStorage.getItem('cc_ai_key'); if (k) { const el = document.getElementById('ai-key'); if (el) el.value = k; } })();
 
         async function logout() {
             await CC.logout();
