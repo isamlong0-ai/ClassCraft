@@ -739,33 +739,6 @@
     }
 
     // ---------- Backup / Restore ----------
-    async function exportAll() {
-        var users = await getUsers();
-        var sekolah = await getSekolah();
-        var rombel = await getRombel();
-        return { users: users, sekolah: sekolah, rombel: rombel, exportedAt: new Date().toISOString() };
-    }
-
-    async function restoreAll(data) {
-        if (!data) return;
-        if (data.sekolah) { await saveSekolah(data.sekolah); }
-        if (Array.isArray(data.users)) {
-            if (!sb) { lsSet(KEY.users, data.users); }
-            else {
-                for (var i = 0; i < data.users.length; i++) {
-                    var u = data.users[i];
-                    var existing = await sb.from('guru').select('id').eq('username', u.username).maybeSingle();
-                    if (!existing.error && !existing.data) {
-                        await addUser(u);
-                    }
-                }
-            }
-        }
-        if (Array.isArray(data.rombel) && !sb) {
-            lsSet(KEY.rombel, data.rombel);
-        }
-    }
-
     // Revalidasi sesi terpusat: jika token Supabase tidak valid, paksa ke login.
     if (sb) {
         (function () {
@@ -812,8 +785,7 @@
         printArea: printArea,
         exportWord: exportWord,
         exportExcel: exportExcel,
-        exportAll: exportAll,
-        restoreAll: restoreAll,
+
         defaults: { users: DEFAULT_USERS, sekolah: DEFAULT_SEKOLAH, rombel: DEFAULT_ROMBEL }
     };
 })();

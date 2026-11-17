@@ -234,6 +234,7 @@ create index if not exists idx_jurnal_guru_tgl     on public.jurnal_mengajar(gur
 create index if not exists idx_jurnal_rombel       on public.jurnal_mengajar(rombel_id);
 create index if not exists idx_jurnal_ta_sem       on public.jurnal_mengajar(tahun_ajaran, semester);
 create index if not exists idx_presensi_rombel_tgl on public.presensi(rombel_id, tanggal);
+create index if not exists idx_presensi_guru        on public.presensi(guru_id);
 create index if not exists idx_presensi_siswa      on public.presensi(siswa_id);
 create index if not exists idx_presensi_ta_sem     on public.presensi(tahun_ajaran, semester);
 create index if not exists idx_paket_soal_guru     on public.paket_soal(guru_id);
@@ -528,7 +529,7 @@ create policy read_sekolah on public.sekolah    for select to authenticated usin
 create policy read_guru    on public.guru       for select to authenticated using (true);
 create policy read_rombel  on public.rombel     for select to authenticated using (true);
 create policy read_siswa   on public.siswa      for select to authenticated using (true);
-create policy read_modul   on public.modul_ajar for select to authenticated using (true);
+create policy read_modul   on public.modul_ajar for select to authenticated using (guru_id = auth.uid() or public.is_admin());
 create policy read_anggota_rombel on public.anggota_rombel for select to authenticated using (true);
 
 create policy admin_sekolah on public.sekolah    for all to authenticated using (public.is_admin()) with check (public.is_admin());
@@ -545,26 +546,26 @@ alter table public.jurnal_mengajar enable row level security;
 alter table public.presensi       enable row level security;
 alter table public.paket_soal     enable row level security;
 
-create policy read_jurnal_mengajar on public.jurnal_mengajar for select to authenticated using (true);
+create policy read_jurnal_mengajar on public.jurnal_mengajar for select to authenticated using (guru_id = auth.uid() or public.is_admin());
 create policy write_jurnal_mengajar on public.jurnal_mengajar for all to authenticated
     using (guru_id = auth.uid() or public.is_admin()) with check (guru_id = auth.uid() or public.is_admin());
 
-create policy read_presensi on public.presensi for select to authenticated using (true);
+create policy read_presensi on public.presensi for select to authenticated using (guru_id = auth.uid() or public.is_admin());
 create policy write_presensi on public.presensi for all to authenticated
     using (guru_id = auth.uid() or public.is_admin()) with check (guru_id = auth.uid() or public.is_admin());
 
-create policy read_paket_soal on public.paket_soal for select to authenticated using (true);
+create policy read_paket_soal on public.paket_soal for select to authenticated using (guru_id = auth.uid() or public.is_admin());
 create policy write_paket_soal on public.paket_soal for all to authenticated
     using (guru_id = auth.uid() or public.is_admin()) with check (guru_id = auth.uid() or public.is_admin());
 
 alter table public.bank_soal enable row level security;
 alter table public.paket_soal_butir enable row level security;
 
-create policy read_bank_soal on public.bank_soal for select to authenticated using (true);
+create policy read_bank_soal on public.bank_soal for select to authenticated using (guru_id = auth.uid() or public.is_admin());
 create policy write_bank_soal on public.bank_soal for all to authenticated
     using (guru_id = auth.uid() or public.is_admin()) with check (guru_id = auth.uid() or public.is_admin());
 
-create policy read_paket_soal_butir on public.paket_soal_butir for select to authenticated using (true);
+create policy read_paket_soal_butir on public.paket_soal_butir for select to authenticated using (exists (select 1 from public.paket_soal p where p.id = paket_soal_butir.paket_id and (p.guru_id = auth.uid() or public.is_admin())));
 create policy write_paket_soal_butir on public.paket_soal_butir for all to authenticated
     using (exists (select 1 from public.paket_soal p where p.id = paket_soal_butir.paket_id and (p.guru_id = auth.uid() or public.is_admin())))
     with check (exists (select 1 from public.paket_soal p where p.id = paket_soal_butir.paket_id and (p.guru_id = auth.uid() or public.is_admin())));

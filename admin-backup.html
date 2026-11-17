@@ -36,11 +36,21 @@
         <!-- BACKUP -->
         <div class="bg-white p-6 rounded-xl shadow-md border border-slate-200 space-y-3">
             <h2 class="text-base font-bold text-indigo-700 border-b pb-2"><i class="fas fa-download mr-2"></i>Backup Database & File</h2>
-            <p class="text-xs text-slate-500">Mengunduh seluruh data sistem ke file JSON, termasuk data file KOP/TTD sekolah yang tersimpan di database.</p>
+            <p class="text-xs text-slate-500">Mengunduh seluruh data sistem ke file JSON, termasuk database dan file KOP/TTD (bucket <code>sekolah-assets</code>).</p>
+            <div id="last-backup-info" class="text-[10px] text-slate-500"></div>
             <button onclick="backupDatabase()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs px-4 py-2 rounded-lg transition font-medium flex items-center gap-1.5">
                 <i class="fas fa-download"></i> Unduh Backup (.json)
             </button>
             <p id="backup-status" class="text-[10px] text-slate-400"></p>
+            <div id="last-backup-reset" class="text-xs text-red-600 font-semibold hidden"><i class="fas fa-exclamation-triangle mr-1"></i> Backup terakhir lebih dari 7 hari yang lalu. Segera unduh backup baru.</div>
+            <details class="text-[10px] text-slate-600">
+                <summary class="cursor-pointer font-semibold text-indigo-700">Backup terjadwal (opsi bawaan Supabase)</summary>
+                <ol class="mt-1 ml-4 list-decimal space-y-0.5">
+                    <li>Dashboard Supabase → Project → Database → Backups → aktifkan <b>Scheduled Backups</b> (memerlukan paket Micro/Team ke atas).</li>
+                    <li>Jika paket gratis: gunakan cron eksternal (mis. GitHub Actions / layanan cron.com) yang memicu job <code>pg_dump</code> ke storage bucket atau mengirim file hasil dump via email, lalu unduh ke komputer Anda.</li>
+                    <li>Alternatif lokal paling aman: unduh backup dengan tombol di atas secara berkala (mis. setiap minggu sebelum awal semester atau setelah perubahan besar).</li>
+                </ol>
+            </details>
         </div>
 
         <!-- RESTORE -->
@@ -55,6 +65,15 @@
                 </label>
             </div>
             <p id="restore-status" class="text-[10px] text-slate-400"></p>
+            <details class="text-[10px] text-slate-600">
+                <summary class="cursor-pointer font-semibold text-amber-700">Cara restore lengkap di proyek baru</summary>
+                <ol class="mt-1 ml-4 list-decimal space-y-0.5">
+                    <li>Buat user Auth di Dashboard Supabase → Authentication → Add User, untuk setiap username pada file backup (<code>authUsers</code>). Email = <code>username@classcraft.local</code>. Atur password sementara.</li>
+                    <li>Isi tabel <code>guru</code>: insert baris dari backup (ID harus sama dengan Auth user yang dibuat).</li>
+                    <li>Kelola restore ini: masuk sebagai admin, pilih file backup, lalu klik Restore. File restore akan membuat sisa data.</li>
+                    <li>Password tidak bisa dipulihkan; setiap user harus reset password (Dashboard atau fitur Reset Password).</li>
+                </ol>
+            </details>
         </div>
 
         <!-- DANGER ZONE -->
@@ -95,6 +114,7 @@
             }
             document.getElementById('header-sekolah').innerText = dbSekolah.nama;
             document.getElementById('header-ta-info').innerText = `T.A: ${dbSekolah.tahunAjaran || '2026/2027'} | Semester: ${dbSekolah.semester || 'Ganjil'}`;
+            tampilkanStatusBackupTerakhir();
         });
 
         function esc(str) {
@@ -114,6 +134,37 @@
                     if (error) throw new Error(t + ': ' + error.message);
                     backup.tables[t] = data || [];
                 }
+                // Export file dari storage bucket (sekolah-assets: KOP/TTD)
+                status.innerText = 'Mengunduh file storage...';
+                backup.files = [];
+                const listRes = await sb.storage.from('sekolah-assets').list('', { limit: 100 });
+                const files = (listRes.data || []).filter(f => f && f.name);
+                for (const f of files) {
+                    const dl = await sb.storage.from('sekolah-assets').download(f.name);
+                    if (dl.error) { console.error('Download ' + f.name, dl.error); continue; }
+                    const buf = await dl.data.arrayBuffer();
+                    const bytes = new Uint8Array(buf);
+                    let binary = '';
+                    for (let i = 0; i < bytes.length; i += 0x8000) {
+                        binary += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+                    }
+                    const b64 = btoa(binary);
+                    backup.files.push({ name: f.name, contentType: dl.data.type || 'application/octet-stream', base64: b64 });
+                }
+                // Auth user account identifiers (email synthesized dari username).
+                // Password TIDAK dapat di-backup; user harus reset setelah restore
+                // atau dibuat ulang dengan password sementara yang sama.
+                backup.authUsers = (backup.tables.guru || []).map(g => ({
+                    username: g.username,
+                    role: g.role,
+                    nama: g.nama,
+                    mapel: g.mapel,
+                    pangkat: g.pangkat,
+                    gol: g.gol,
+                    aktif: g.aktif,
+                    email: String(g.username || '').toLowerCase() + '@classcraft.local'
+                }));
+                backup.authRestoreNote = 'Buat Auth user (email = <username>@classcraft.local) di Dashboard Supabase terlebih dahulu, lalu jalankan restore. Password tidak ikut backup; setiap user harus reset password.';
                 const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
                 const a = document.createElement('a');
                 a.href = URL.createObjectURL(blob);
@@ -121,6 +172,8 @@
                 a.click();
                 URL.revokeObjectURL(a.href);
                 status.innerText = 'Backup selesai: ' + tables.length + ' tabel terunduh.';
+                try { localStorage.setItem('cc_last_backup', new Date().toISOString()); } catch (e) {}
+                tampilkanStatusBackupTerakhir();
             } catch (err) {
                 console.error(err);
                 status.innerText = 'Gagal backup: ' + (err.message || err);
@@ -145,6 +198,27 @@
                 const text = await file.text();
                 const data = JSON.parse(text);
                 if (!data || !data.tables) { alert('Format backup tidak valid.'); return; }
+
+                // Re-upload file storage terlebih dahulu (KOP/TTD)
+                if (Array.isArray(data.files) && data.files.length) {
+                    status.innerText = 'Mengembalikan file storage...';
+                    // Hapus file lama
+                    const listOld = await sb.storage.from('sekolah-assets').list('', { limit: 100 });
+                    const oldNames = (listOld.data || []).map(f => f.name).filter(Boolean);
+                    if (oldNames.length) { await sb.storage.from('sekolah-assets').remove(oldNames); }
+                    for (const f of data.files) {
+                        if (!f || !f.name || !f.base64) continue;
+                        try {
+                            const raw = atob(f.base64);
+                            const bytes = new Uint8Array(raw.length);
+                            for (let i = 0; i < raw.length; i++) bytes[i] = raw.charCodeAt(i);
+                            const up = await sb.storage.from('sekolah-assets').upload(f.name, bytes, { contentType: f.contentType || 'application/octet-stream', upsert: true });
+                            if (up.error) console.error('Upload ' + f.name, up.error);
+                        } catch (e) {
+                            console.error('Upload ' + f.name, e);
+                        }
+                    }
+                }
 
                 const order = ['sekolah', 'guru', 'rombel', 'siswa', 'anggota_rombel', 'modul_ajar', 'jurnal_mengajar', 'presensi', 'paket_soal_butir', 'bank_soal', 'paket_soal'];
                 // Hapus data lama (urutan aman: anak dulu); admin tidak dihapus
@@ -182,6 +256,27 @@
             } catch (err) {
                 console.error(err);
                 status.innerText = 'Gagal restore: ' + (err.message || err);
+            }
+        }
+
+        function tampilkanStatusBackupTerakhir() {
+            try {
+                const raw = localStorage.getItem('cc_last_backup');
+                const info = document.getElementById('last-backup-info');
+                const reset = document.getElementById('last-backup-reset');
+                if (!raw) {
+                    if (info) info.innerHTML = '<i class="fas fa-circle-info mr-1"></i>Belum ada backup yang tersimpan dari browser ini.';
+                    if (reset) reset.classList.remove('hidden');
+                    return;
+                }
+                const dt = new Date(raw);
+                const diffDays = Math.floor((Date.now() - dt.getTime()) / (1000 * 60 * 60 * 24));
+                if (info) info.innerHTML = '<i class="fas fa-circle-check mr-1 text-emerald-600"></i>Backup terakhir: ' + dt.toLocaleString('id-ID') + ' (' + diffDays + ' hari yang lalu)';
+                if (reset) {
+                    if (diffDays > 7) { reset.classList.remove('hidden'); } else { reset.classList.add('hidden'); }
+                }
+            } catch (e) {
+                console.error('Status backup:', e);
             }
         }
 
