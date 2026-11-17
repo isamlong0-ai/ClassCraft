@@ -552,7 +552,13 @@
             'p { margin: 0 0 5pt; text-align: justify; }',
             'table { border-collapse: collapse; width: 100%; }',
             'th, td { vertical-align: top; }',
-            'table.border, table.border th, table.border td, table[border] th, table[border] td { border: 1px solid #000; }',
+            'tr { page-break-inside: avoid; }',
+            'thead { display: table-header-group; }',
+            'tfoot { display: table-footer-group; }',
+            'h1, h2, h3, h4, h5 { text-align: center; font-weight: bold; margin: 0 0 4pt; line-height: 1.3; page-break-after: avoid; }',
+            'p { margin: 0 0 5pt; text-align: justify; orphans: 3; widows: 3; }',
+            '.overflow-x-auto, .overflow-auto, .overflow-hidden, .overflow-scroll { overflow: visible !important; }',
+            'table.border, table.border th, table.border td, table[border] th, table[border] td { border: 1px solid #000 !important; }',
             'table.border th, table[border] th { background: #eef2ff; text-align: center; }',
             'table.ttd, table.ttd td { border: none; text-align: center; padding: 2pt 6pt; }',
             'table.plain, table.plain td { border: none; }',
@@ -568,7 +574,7 @@
             '.kop-text p { font-size: 10pt; margin: 2pt 0 0; text-align: center; }',
             'img.kop-img { width: 100%; height: auto; max-height: none; }',
             'img.ttd-img { height: 46pt; width: auto; }',
-            '.break-inside-avoid { page-break-inside: avoid; }'
+            '.break-inside-avoid { page-break-inside: avoid; }',
         ].join('\n');
     }
 
@@ -599,7 +605,7 @@
         win.document.write('</body></html>');
         win.document.close();
         // Beri waktu Tailwind CDN memproses kelas sebelum mencetak.
-        setTimeout(function () { try { win.focus(); win.print(); } catch (e) {} }, 900);
+        setTimeout(function () { try { win.focus(); win.print(); } catch (e) {} }, 1200);
     }
 
     // Word & Excel mengabaikan kelas Tailwind. Agar tampilan hasil ekspor
@@ -633,7 +639,14 @@
                 if (v === 'normal' || v === 'auto' || v === 'none' || v === '0px' ||
                     v === 'rgba(0, 0, 0, 0)' || v === 'transparent') continue;
                 // Buang border tanpa ketebalan (0px) agar tidak menambah bingkai palsu.
-                if (prop.indexOf('border-') === 0 && /^0(px|pt|em|rem)?\b/.test(v)) continue;
+                if (prop.indexOf('border-') === 0 && prop !== 'border-collapse') {
+                    var wm = v.match(/^([\d.]+)(px|pt|em|rem)?/);
+                    var w = wm ? parseFloat(wm[1]) : 0;
+                    if (!w || w <= 0) continue;
+                    // Normalisasi agar border terlihat hitam pekat (bukan abu-abu tipis)
+                    // dan tidak sub-piksel di Word/Excel.
+                    v = '1px solid #000';
+                }
                 // Normalisasi nilai logis agar dikenali Word/Excel.
                 if (v === 'start') v = 'left';
                 else if (v === 'end') v = 'right';
@@ -675,9 +688,9 @@
             'h1, h2, h3, h4 { text-align: center; font-weight: bold; margin: 0 0 6pt; }',
             'table { border-collapse: collapse; width: 100%; }',
             'p { margin: 0 0 6pt; }',
-            'table.border, table.border th, table.border td, table[border] th, table[border] td { border: 1px solid #000; }',
+            'table.border, table.border th, table.border td, table[border] th, table[border] td { border: 1px solid #000 !important; }',
             'table.border th, table[border] th { background: #eef2ff; text-align: center; }',
-            'table.ttd, table.ttd td { border: none; text-align: center; }'
+            'table.ttd, table.ttd td { border: none !important; text-align: center; }'
         ].join('\n');
         var html = "<html xmlns:o='urn:schemas-microsoft-com:office:office' " +
             "xmlns:w='urn:schemas-microsoft-com:office:word' " +
@@ -704,7 +717,7 @@
             'h1, h2, h3, h4 { text-align: center; font-weight: bold; }',
             'table { border-collapse: collapse; width: 100%; }',
             'th, td { vertical-align: top; }',
-            'table.border, table.border th, table.border td, table[border] th, table[border] td { border: 1px solid #000; }',
+            'table.border, table.border th, table.border td, table[border] th, table[border] td { border: 1px solid #000 !important; }',
             'table.border th, table[border] th { background: #eef2ff; text-align: center; }'
         ].join('\n');
         var excelHead = "<!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets>" +
