@@ -586,6 +586,11 @@
             } else if (paket.status === 'final' && Array.isArray(paket.snapshot) && paket.snapshot.length) {
                 daftarSoal = JSON.parse(JSON.stringify(paket.snapshot));
             }
+            // Reconcile pivot <-> jsonb: daftar_soal adalah cache; pivot adalah
+            // sumber referensi yang ternormalisasi. Sinkron otomatis saat dibuka.
+            if (paket.status !== 'final' && CC.isConfigured()) {
+                await sinkronPivotDariJsonb(paket.id);
+            }
             document.getElementById('btn-hapus-paket').classList.remove('hidden');
             if (paket.status === 'final') {
                 document.getElementById('btn-finalisasi').classList.add('hidden');
@@ -616,6 +621,24 @@
             renderSemuaDokumen();
         }
 
+        async function sinkronPivotDariJsonb(paketId, soalList) {
+            // Rebuild pivot from daftar_soal so butir_id references stay consistent.
+            if (!paketId || !CC.isConfigured()) return;
+            try {
+                const source = Array.isArray(soalList) ? soalList : (Array.isArray(daftarSoal) ? daftarSoal : []);
+                await CC.client.from('paket_soal_butir').delete().eq('paket_id', paketId);
+                const rows = source
+                    .map((s, i) => s && s.butir_id ? { paket_id: paketId, butir_id: s.butir_id, urutan: i, skor_override: null } : null)
+                    .filter(Boolean);
+                if (rows.length) {
+                    const { error } = await CC.client.from('paket_soal_butir').insert(rows);
+                    if (error) console.error('Reconcile pivot gagal:', error);
+                }
+            } catch (e) {
+                console.error('Reconcile pivot:', e);
+            }
+        }
+
         async function simpanPaketKeSupabase() {
             if (daftarSoal.length === 0) {
                 alert('Tambahkan minimal 1 butir soal sebelum menyimpan paket ke database.');
@@ -626,6 +649,7 @@
             btn.disabled = true;
             btn.innerHTML = `<i class="fas fa-spinner fa-spin mr-1"></i> Menyimpan...`;
 
+            const daftarSnapshot = JSON.parse(JSON.stringify(daftarSoal));
             const payload = {
                 guru_id: profilGuru.id,
                 tahun_ajaran: profilSekolah.tahun_ajaran,
@@ -637,7 +661,7 @@
                 alokasi_waktu: document.getElementById('meta-waktu').value.trim(),
                 acak_soal: document.getElementById('meta-acak-soal').checked,
                 acak_opsi: document.getElementById('meta-acak-opsi').checked,
-                daftar_soal: daftarSoal,
+                daftar_soal: daftarSnapshot,
                 updated_at: new Date().toISOString()
             };
 
@@ -656,16 +680,7 @@
             } else {
                 activePaketId = res.data.id;
                 document.getElementById('btn-hapus-paket').classList.remove('hidden');
-                // Sinkronkan pivot paket_soal_butir
-                if (CC.isConfigured()) {
-                    await CC.client.from('paket_soal_butir').delete().eq('paket_id', activePaketId);
-                    const rows = daftarSoal
-                        .map((s, i) => s.butir_id ? { paket_id: activePaketId, butir_id: s.butir_id, urutan: i, skor_override: null } : null)
-                        .filter(Boolean);
-                    if (rows.length) {
-                        await CC.client.from('paket_soal_butir').insert(rows);
-                    }
-                }
+                await sinkronPivotDariJsonb(activePaketId, daftarSnapshot);
                 await muatArsipPaket();
                 alert('Paket soal, kisi-kisi, dan kunci jawaban berhasil tersimpan di Supabase!');
             }

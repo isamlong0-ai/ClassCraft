@@ -148,6 +148,9 @@ create table if not exists public.presensi (
 
 -- -------------------------------------------------------------
 -- Tabel: paket_soal (bank soal & dokumen asesmen)
+-- daftar_soal (jsonb) = cache/snapshot untuk butir tanpa butir_id (legacy/inline).
+--   Butir dengan butir_id direferensikan lewat paket_soal_butir -> bank_soal.
+--   final dipakai dokumen via snapshot (beku); draft direkonsiliasi otomatis.
 -- -------------------------------------------------------------
 create table if not exists public.paket_soal (
     id            uuid primary key default gen_random_uuid(),
