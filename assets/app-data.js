@@ -598,7 +598,7 @@
         ].join('\n');
         var head = '<!DOCTYPE html><html lang="id"><head><meta charset="UTF-8">' +
             '<title>' + (judul || 'Cetak Dokumen') + '</title>' +
-            '<script src="https://cdn.tailwindcss.com"><\/script>' +
+            '<script src="assets/vendor/tailwind-play.js"><\/script>' +
             '<style>' + css + '</style></head><body>';
         win.document.write(head);
         win.document.write('<div class="doc">' + el.innerHTML + '</div>');

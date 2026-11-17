@@ -4,9 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Guru - Bank Soal & Asesmen</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="assets/vendor/tailwind-play.js"></script>
+    <link href="assets/vendor/fontawesome/all.min.css" rel="stylesheet">
+    <script src="assets/vendor/supabase-js.min.js"></script>
     <script src="assets/supabase-config.js"></script>
     <script src="assets/app-data.js"></script>
 </head>
@@ -477,9 +477,7 @@
         let bankSoal = [];
         let bankUsage = {};
         let selectedBankIds = new Set();
-        let arsipRppSoal = [];
-        let genTPs = [];
-        let genPreview = [];
+
 
         function esc(str) {
             return String(str || '')
@@ -1495,264 +1493,6 @@
             await muatBankSoal();
         }
 
-        async function muatArsipRppSoal() {
-            if (!CC.isConfigured()) return;
-            const { data } = await CC.client.from('modul_ajar').select('*')
-                .eq('guru_id', profilGuru.id)
-                .order('created_at', { ascending: false });
-            arsipRppSoal = data || [];
-        }
-
-        function isiDropdownSumberGenerator() {
-            const sel = document.getElementById('gen-sumber');
-            const cur = sel.value;
-            sel.innerHTML = `<option value="cp">Tempel / Unggah CP</option>`;
-            arsipRppSoal.forEach(r => {
-                const konten = r.konten || {};
-                const jmlTP = Array.isArray(konten.listElemen)
-                    ? konten.listElemen.reduce((a, e) => a + (Array.isArray(e.tpList) ? e.tpList.length : 0), 0)
-                    : 0;
-                sel.innerHTML += `<option value="${esc(r.id)}">${esc(r.tingkat || '-')} - ${esc(r.mapel || profilGuru.mapel)} (${jmlTP} TP)</option>`;
-            });
-            sel.value = cur || 'cp';
-            muatSumberGenerator();
-        }
-
-        function muatSumberGenerator() {
-            const val = document.getElementById('gen-sumber').value;
-            const panelCp = document.getElementById('gen-panel-cp');
-            const panelRpp = document.getElementById('gen-panel-rpp');
-            if (val === 'cp') {
-                panelCp.classList.remove('hidden');
-                panelRpp.classList.add('hidden');
-                genTPs = [];
-                document.getElementById('gen-cp-preview').value = '';
-            } else {
-                panelCp.classList.add('hidden');
-                panelRpp.classList.remove('hidden');
-                const rpp = arsipRppSoal.find(r => r.id === val);
-                const tps = [];
-                if (rpp) {
-                    const konten = rpp.konten || {};
-                    document.getElementById('gen-cp-preview').value = konten.rawCP || '(CP tidak tersimpan)';
-                    (konten.listElemen || []).forEach(el => {
-                        (el.tpList || []).forEach(tp => { tps.push(Object.assign({}, tp, { _elemen: el.nama })); });
-                    });
-                }
-                genTPs = tps.filter(tp => {
-                    const d = tp.deskripsi || '';
-                    if (!d || d.length < 15) return false;
-                    if (/capaian pembelajaran|mata pelajaran/i.test(d)) return false;
-                    const core = d.replace(/^(Peserta didik mampu\s*)+/i, '').trim();
-                    if (!core || core === core.toUpperCase()) return false;
-                    return true;
-                });
-                renderGenTpList();
-            }
-        }
-
-        function parseCpGenerator() {
-            const raw = document.getElementById('gen-cp').value.trim();
-            if (!raw) { alert('Tempel naskah CP terlebih dahulu.'); return; }
-            const listElemen = ekstraksiCPKeElemen(raw);
-            const tps = [];
-            listElemen.forEach(el => {
-                (el.tpList || []).forEach(tp => { tps.push(Object.assign({}, tp, { _elemen: el.nama })); });
-            });
-            genTPs = tps.filter(tp => !/capaian pembelajaran|mata pelajaran/i.test(tp.deskripsi || ''));
-            document.getElementById('gen-panel-cp').classList.add('hidden');
-            document.getElementById('gen-panel-rpp').classList.remove('hidden');
-            renderGenTpList();
-        }
-
-        function resetTpGenerator() {
-            genTPs = [];
-            document.getElementById('gen-cp').value = '';
-            document.getElementById('gen-tp-list').innerHTML = '';
-            document.getElementById('gen-panel-cp').classList.remove('hidden');
-            document.getElementById('gen-panel-rpp').classList.add('hidden');
-            batalGenerate();
-        }
-
-        // Parser CP (salinan dari guru-rpp)
-        function ekstraksiCPKeElemen(text) {
-            const lines = text.split('\n');
-            const elemenList = [];
-            let currentElemen = null;
-            lines.forEach(line => {
-                const trimmed = line.trim();
-                if (!trimmed) return;
-                if (trimmed.toUpperCase().startsWith('ELEMEN') || trimmed.toUpperCase().includes('ELEMEN:')) {
-                    if (currentElemen) elemenList.push(currentElemen);
-                    let __body = trimmed.replace(/^ELEMEN\s*\d*\s*:?/i, '').trim();
-                    let __dot = __body.indexOf('.');
-                    let __nama = __body, __rest = '';
-                    if (__dot > 0 && __dot < 60) { __nama = __body.slice(0, __dot).trim(); __rest = __body.slice(__dot + 1).trim(); }
-                    if (!__nama || __nama.length > 70) { __nama = 'Elemen Utama'; }
-                    if (__nama === __nama.toUpperCase() && __nama.length > 3) { __nama = __nama.toLowerCase().replace(/(?:^|\s)\S/g, c => c.toUpperCase()).replace(/\b(Dan|Di|Ke|Dari|Untuk|Dengan|Atau|Yang|Dan)\b/g, w => w.toLowerCase()); }
-                    currentElemen = { nama: __nama, cpTeks: __rest, tpList: [] };
-                } else if (currentElemen) {
-                    currentElemen.cpTeks += ' ' + trimmed;
-                }
-            });
-            if (currentElemen) elemenList.push(currentElemen);
-            if (elemenList.length === 0) {
-                const paragraphs = text.split('\n\n').filter(p => p.trim());
-                paragraphs.forEach((p, idx) => { elemenList.push({ nama: `Elemen Pembelajaran ${idx + 1}`, cpTeks: p.trim(), tpList: [] }); });
-            }
-            elemenList.forEach((el, eIdx) => {
-                const kalimat = el.cpTeks.split('.').map(k => k.trim()).filter(k => k.length > 10 && k.length < 200 && !/^ELEMEN/i.test(k) && !(k === k.toUpperCase() && k.length > 5));
-                if (kalimat.length > 0) {
-                    kalimat.forEach((k, kIdx) => {
-                        el.tpList.push({ kode: `TP ${eIdx + 1}.${kIdx + 1}`, deskripsi: /^peserta didik mampu/i.test(k) ? `${k.charAt(0).toUpperCase() + k.slice(1)}.` : `Peserta didik mampu ${k.charAt(0).toLowerCase() + k.slice(1)}.`, jp: '4 JP', p3: 'Bernalar Kritis, Gotong Royong' });
-                    });
-                } else {
-                    el.tpList.push({ kode: `TP ${eIdx + 1}.1`, deskripsi: `Peserta didik mampu memahami dan menerapkan konsep ${el.nama}.`, jp: '4 JP', p3: 'Bernalar Kritis, Mandiri' });
-                }
-            });
-            return elemenList;
-        }
-
-        function renderGenTpList() {
-            const box = document.getElementById('gen-tp-list');
-            if (!genTPs.length) { box.innerHTML = '<p class="text-slate-400">Tidak ada TP. Analisis CP atau pilih RPP lain.</p>'; return; }
-            box.innerHTML = '';
-            genTPs.forEach((tp, i) => {
-                box.innerHTML += `
-                    <label class="flex items-start gap-2 text-[11px]">
-                        <input type="checkbox" class="gen-tp-check mt-0.5" data-idx="${i}" checked>
-                        <span><b>${esc(tp.kode)}</b> (${esc(tp._elemen)}) — ${esc((tp.deskripsi || '').slice(0, 90))}</span>
-                    </label>
-                `;
-            });
-        }
-
-        function generateOne(tp, bentuk, kesulitan) {
-            const elemen = tp._elemen || '';
-            const desk = tp.deskripsi || '';
-            const core = desk.replace(/^(Peserta didik mampu\s*)+/i, '').replace(/\.$/, '');
-            const kode = tp.kode;
-            const level = kesulitan === 'mudah' ? 'L1 (LotS - Pengetahuan/Pemahaman)' : kesulitan === 'sulit' ? 'L3 (HotS - Penalaran/Analisis)' : 'L2 (MotS - Penerapan)';
-            const skor = kesulitan === 'sulit' ? 5 : kesulitan === 'menengah' ? 3 : 2;
-            if (bentuk === 'PG') {
-                let pertanyaan;
-                if (kesulitan === 'mudah') pertanyaan = `Manakah pernyataan berikut yang paling tepat menggambarkan ${core}?`;
-                else if (kesulitan === 'menengah') pertanyaan = `Disajikan situasi pembelajaran terkait ${elemen}, peserta didik diminta menentukan ${core}. Pilihan yang paling tepat adalah ...`;
-                else pertanyaan = `Analisislah pernyataan berikut. Manakah pilihan yang paling tepat terkait ${core}?`;
-                const others = genTPs.filter(t => t.kode !== kode).map(t => (t.deskripsi || '').replace(/^Peserta didik mampu\s*/i, '').replace(/\.$/, ''));
-                const candidateSet = new Set();
-                others.forEach(c => { const v = (c || '').trim(); if (v && v !== core) candidateSet.add(v); });
-                const distractors = [];
-                for (const c of candidateSet) {
-                    if (distractors.length >= 3) break;
-                    if (!distractors.includes(c)) distractors.push(c);
-                }
-                const generic = ['Pernyataan yang kurang tepat', 'Pilihan yang tidak sesuai dengan konteks', 'Jawaban yang tidak relevan'];
-                let gi = 0;
-                while (distractors.length < 3) {
-                    let cand = generic[gi % generic.length];
-                    gi++;
-                    if (!distractors.includes(cand) && cand !== core) distractors.push(cand);
-                    if (gi > 20) break;
-                }
-                const finalDistractors = distractors.slice(0, 3);
-                const opts = [core, ...finalDistractors].sort(() => Math.random() - 0.5);
-                const kunci = ['A','B','C','D'][opts.indexOf(core)];
-                return { tipe: 'PG', level, kesulitan, skor, tp_materi: `${kode} ${elemen}`.trim(), indikator: `Peserta didik dapat ${core}.`, pertanyaan, opsi_a: opts[0], opsi_b: opts[1], opsi_c: opts[2], opsi_d: opts[3], kunci, stimulus: '', tags: [String(elemen).toLowerCase()] };
-            }
-            let pertanyaan;
-            if (kesulitan === 'mudah') pertanyaan = `Jelaskan dengan singkat: ${core}!`;
-            else if (kesulitan === 'menengah') pertanyaan = `Bandingkan dan jelaskan: ${core}!`;
-            else pertanyaan = `Analisis dan berikan 2 contoh penerapan: ${core}!`;
-            const kunci = `Jawaban memuat poin utama: ${core}. (Pedoman penskoran sesuai rubrik guru.)`;
-            return { tipe: 'URAIAN', level, kesulitan, skor, tp_materi: `${kode} ${elemen}`.trim(), indikator: `Peserta didik dapat ${core}.`, pertanyaan, opsi_a: '', opsi_b: '', opsi_c: '', opsi_d: '', kunci, stimulus: '', tags: [String(elemen).toLowerCase()] };
-        }
-
-        function generateSoalOtomatis() {
-            const checked = Array.from(document.querySelectorAll('.gen-tp-check:checked')).map(c => genTPs[parseInt(c.dataset.idx, 10)]);
-            const tps = checked.length ? checked : genTPs;
-            if (!tps.length) { alert('Tidak ada TP. Analisis CP atau pilih RPP terlebih dahulu.'); return; }
-            const jumlah = Math.max(1, parseInt(document.getElementById('gen-jumlah').value, 10) || 10);
-            const mudah = Math.max(0, parseInt(document.getElementById('gen-k-mudah').value, 10) || 0);
-            const menengah = Math.max(0, parseInt(document.getElementById('gen-k-menengah').value, 10) || 0);
-            const sulit = Math.max(0, parseInt(document.getElementById('gen-k-sulit').value, 10) || 0);
-            let counts = { mudah, menengah, sulit };
-            let total = counts.mudah + counts.menengah + counts.sulit;
-            if (total === 0) { counts.menengah = jumlah; total = jumlah; }
-            if (total !== jumlah) { counts.menengah += (jumlah - total); if (counts.menengah < 0) { counts.mudah += counts.menengah; counts.menengah = 0; } }
-            const slots = [];
-            ['mudah','menengah','sulit'].forEach(k => { for (let i = 0; i < (counts[k] || 0); i++) slots.push(k); });
-            while (slots.length > jumlah) slots.pop();
-            while (slots.length < jumlah) slots.push('menengah');
-
-            const bentukOpt = document.getElementById('gen-bentuk').value;
-            const propPG = parseInt(document.getElementById('gen-prop-pg').value, 10) || 60;
-            const pgCount = bentukOpt === 'PG' ? slots.length : bentukOpt === 'URAIAN' ? 0 : Math.round(slots.length * (propPG / 100));
-
-            genPreview = [];
-            slots.forEach((kes, i) => {
-                const bentuk = (bentukOpt === 'PG') ? 'PG' : (bentukOpt === 'URAIAN') ? 'URAIAN' : (i < pgCount ? 'PG' : 'URAIAN');
-                const tp = tps[genPreview.length % tps.length];
-                genPreview.push(generateOne(tp, bentuk, kes));
-            });
-
-            // render preview
-            const box = document.getElementById('gen-preview');
-            box.innerHTML = '';
-            genPreview.forEach((s, i) => {
-                box.innerHTML += `<div class="border rounded p-2"><b>${i + 1}.</b> [${esc(s.tipe)}][${esc(s.kesulitan)}] ${esc(s.pertanyaan)}${s.tipe === 'PG' ? `<br><span class="text-slate-500">A. ${esc(s.opsi_a)} B. ${esc(s.opsi_b)} C. ${esc(s.opsi_c)} D. ${esc(s.opsi_d)} (Kunci: ${esc(s.kunci)})</span>` : `<br><span class="text-slate-500">Kunci: ${esc((s.kunci || '').slice(0, 80))}</span>`}</div>`;
-            });
-            document.getElementById('gen-preview-count').innerText = genPreview.length;
-            document.getElementById('gen-preview-wrap').classList.remove('hidden');
-        }
-
-        async function simpanHasilGenerate() {
-            if (!genPreview.length) { alert('Tidak ada hasil generate.'); return; }
-            if (!CC.isConfigured()) { alert('Penyimpanan memerlukan database.'); return; }
-            let saved = 0;
-            for (const s of genPreview) {
-                const item = Object.assign({}, s, { butir_id: null });
-                // simpan ke bank
-                const bankPayload = {
-                    guru_id: profilGuru.id,
-                    mapel: document.getElementById('meta-mapel').value.trim() || profilGuru.mapel || '',
-                    tingkat: document.getElementById('meta-tingkat').value,
-                    elemen: '',
-                    tp: item.tp_materi,
-                    indikator: item.indikator,
-                    bentuk: item.tipe,
-                    level_kognitif: item.level,
-                    tingkat_kesulitan: item.kesulitan || 'menengah',
-                    stimulus: item.stimulus || '',
-                    pertanyaan: item.pertanyaan,
-                    opsi_a: item.opsi_a, opsi_b: item.opsi_b, opsi_c: item.opsi_c, opsi_d: item.opsi_d,
-                    kunci: item.kunci,
-                    skor: item.skor,
-                    tags: item.tags || [],
-                    sumber: 'otomatis',
-                    tahun_ajaran: profilSekolah.tahun_ajaran,
-                    semester: profilSekolah.semester,
-                    updated_at: new Date().toISOString()
-                };
-                const { data, error } = await CC.client.from('bank_soal').insert([bankPayload]).select().single();
-                if (error) { alert('Gagal menyimpan butir: ' + error.message); continue; }
-                item.butir_id = data.id;
-                daftarSoal.push(item);
-                saved++;
-            }
-            batalGenerate();
-            renderDaftarSoal();
-            renderSemuaDokumen();
-            await muatBankSoal();
-            alert(saved + ' butir soal hasil generate disimpan ke bank & paket.');
-        }
-
-        function batalGenerate() {
-            genPreview = [];
-            document.getElementById('gen-preview-wrap').classList.add('hidden');
-            document.getElementById('gen-preview').innerHTML = '';
-        }
-
         async function finalisasiPaket() {
             if (!activePaketId) { alert('Simpan paket terlebih dahulu.'); return; }
             if (!confirm('Finalisasi paket ini? Setelah final, butir soal akan di-snapshot dan tidak mengikuti perubahan bank.')) return;
@@ -2013,69 +1753,6 @@
             return result;
         }
 
-        function simpanAiKey() {
-            const key = (document.getElementById('ai-key').value || '').trim();
-            if (key) {
-                localStorage.setItem('cc_ai_key', key);
-                alert('API key disimpan di browser.');
-            } else {
-                localStorage.removeItem('cc_ai_key');
-                alert('API key dihapus.');
-            }
-        }
-
-        async function generateSoalAI() {
-            const key = localStorage.getItem('cc_ai_key');
-            if (!key) { alert('Masukkan dan simpan API key terlebih dahulu.'); return; }
-            const checked = Array.from(document.querySelectorAll('.gen-tp-check:checked')).map(c => genTPs[parseInt(c.dataset.idx, 10)]);
-            const tps = checked.length ? checked : genTPs;
-            if (!tps.length) { alert('Tidak ada TP. Analisis CP atau pilih RPP terlebih dahulu.'); return; }
-            const jumlah = Math.max(1, parseInt(document.getElementById('gen-jumlah').value, 10) || 10);
-            const bentukOpt = document.getElementById('gen-bentuk').value;
-            const tpText = tps.map(t => `- ${t.kode} (${t._elemen}): ${t.deskripsi}`).join('\n');
-            const prompt = `Anda adalah guru pembuat soal. Buat ${jumlah} soal dari daftar Tujuan Pembelajaran berikut:\n${tpText}\n\nBentuk soal: ${bentukOpt === 'campuran' ? 'campuran PG dan Uraian' : bentukOpt}.\nKembalikan HANYA array JSON (tanpa penjelasan) dengan ${jumlah} objek, masing-masing berisi field:\n{"tipe":"PG" atau "URAIAN","kesulitan":"mudah/menengah/sulit","skor":angka,"tp_materi":"kode TP + elemen","indikator":"indikator soal","pertanyaan":"teks soal","opsi_a":"","opsi_b":"","opsi_c":"","opsi_d":"","kunci":"A/B/C/D atau rubrik uraian"}\nUntuk PG sertakan 4 opsi (A-D) dan kunci huruf. Untuk Uraian, opsi kosong dan kunci berisi rubrik.\nPastikan soal bervariasi, substantif, dan sesuai materi.`;
-
-            const btn = event && event.target;
-            try {
-                const res = await fetch('https://api.openai.com/v1/chat/completions', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + key },
-                    body: JSON.stringify({ model: 'gpt-4o-mini', messages: [{ role: 'user', content: prompt }], temperature: 0.7 })
-                });
-                if (!res.ok) { alert('Gagal memanggil AI: ' + res.status + ' ' + res.statusText); return; }
-                const data = await res.json();
-                const content = data.choices && data.choices[0] && data.choices[0].message ? data.choices[0].message.content : '';
-                const m = content.match(/\[[\s\S]*\]/);
-                if (!m) { alert('Respons AI tidak berisi JSON array.'); return; }
-                const items = JSON.parse(m[0]);
-                genPreview = items.map(it => ({
-                    tipe: (it.tipe || 'PG').toUpperCase() === 'URAIAN' ? 'URAIAN' : 'PG',
-                    level: (it.kesulitan === 'mudah') ? 'L1 (LotS - Pengetahuan/Pemahaman)' : (it.kesulitan === 'sulit') ? 'L3 (HotS - Penalaran/Analisis)' : 'L2 (MotS - Penerapan)',
-                    kesulitan: (it.kesulitan || 'menengah').toLowerCase(),
-                    skor: parseInt(it.skor, 10) || 2,
-                    tp_materi: it.tp_materi || '',
-                    indikator: it.indikator || '',
-                    pertanyaan: it.pertanyaan || '',
-                    opsi_a: it.opsi_a || '', opsi_b: it.opsi_b || '', opsi_c: it.opsi_c || '', opsi_d: it.opsi_d || '',
-                    kunci: it.kunci || (it.tipe === 'URAIAN' ? '' : 'A'),
-                    stimulus: '', tags: []
-                }));
-                // render preview
-                const box = document.getElementById('gen-preview');
-                box.innerHTML = '';
-                genPreview.forEach((s, i) => {
-                    box.innerHTML += `<div class="border rounded p-2"><b>${i + 1}.</b> [${esc(s.tipe)}][${esc(s.kesulitan)}] ${esc(s.pertanyaan)}${s.tipe === 'PG' ? `<br><span class="text-slate-500">A. ${esc(s.opsi_a)} B. ${esc(s.opsi_b)} C. ${esc(s.opsi_c)} D. ${esc(s.opsi_d)} (Kunci: ${esc(s.kunci)})</span>` : `<br><span class="text-slate-500">Kunci: ${esc((s.kunci || '').slice(0, 80))}</span>`}</div>`;
-                });
-                document.getElementById('gen-preview-count').innerText = genPreview.length;
-                document.getElementById('gen-preview-wrap').classList.remove('hidden');
-            } catch (e) {
-                alert('Error: ' + e.message);
-            }
-        }
-
-        // load saved key
-        (function(){ const k = localStorage.getItem('cc_ai_key'); if (k) { const el = document.getElementById('ai-key'); if (el) el.value = k; } })();
-
         function loadScript(src) {
             return new Promise((resolve, reject) => {
                 if (document.querySelector('script[src="' + src + '"]')) { resolve(); return; }
@@ -2095,7 +1772,7 @@
             let items = [];
             if (format === 'excel') {
                 try {
-                    await loadScript('https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js');
+                    await loadScript('assets/vendor/xlsx.full.min.js');
                     const data = await file.arrayBuffer();
                     const wb = XLSX.read(data, { type: 'array' });
                     const ws = wb.Sheets[wb.SheetNames[0]];
@@ -2112,7 +1789,7 @@
                 let parsedText = '';
                 if (isZip) {
                     try {
-                        await loadScript('https://cdn.jsdelivr.net/npm/mammoth@1.6.0/mammoth.browser.min.js');
+                        await loadScript('assets/vendor/mammoth.browser.min.js');
                         const result = await mammoth.extractRawText({ arrayBuffer: ab });
                         if (result && result.value) parsedText = result.value;
                     } catch (e) { /* fallback */ }

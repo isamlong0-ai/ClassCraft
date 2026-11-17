@@ -1,0 +1,36 @@
+name: Smoke Test
+
+# Berjalan saat push & pull_request (BUKAN schedule), sehingga tidak kena
+# aturan GitHub yang menonaktifkan scheduled workflow setelah 60 hari.
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Start static server
+        run: |
+          cd "$GITHUB_WORKSPACE"
+          python3 -m http.server 5599 &
+          sleep 2
+          curl -sf -o /dev/null "http://127.0.0.1:5599/index.html"
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install Playwright (runner-only, tidak di-commit)
+        run: |
+          npm init -y
+          npm install --no-save playwright@1.54.0
+          npx playwright install chromium --with-deps
+
+      - name: Run smoke test
+        run: node scripts/smoke.test.js
