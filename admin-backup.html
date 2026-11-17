@@ -53,6 +53,34 @@
             </details>
         </div>
 
+        <!-- BACKUP OTOMATIS -->
+        <div class="bg-white p-6 rounded-xl shadow-md border border-slate-200 space-y-3">
+            <h2 class="text-base font-bold text-indigo-700 border-b pb-2"><i class="fas fa-robot mr-2"></i>Backup Otomatis (Cron Eksternal)</h2>
+            <p class="text-xs text-slate-500">Gunakan cron eksternal (mis. cron-job.org) yang memanggil Edge Function <code>backup-now</code> seminggu sekali. Backup disimpan di bucket privat <code>classcraft-backups</code> (maks. 10 file).</p>
+            <p class="text-xs font-semibold text-slate-700">Langkah konfigurasi:</p>
+            <ol class="ml-5 list-decimal text-[10px] text-slate-600 space-y-0.5">
+                <li>Buka cron-job.org (atau Cloudflare Worker / layanan cron lainnya).</li>
+                <li>URL: <code>https://dfmzgyxrdifzlogjxuwi.supabase.co/functions/v1/backup-now</code> (Method: POST, Content-Type: application/json).</li>
+                <li>Body: <code>{"secret":"<span id="cron-secret-inline">(memuat...)</span>"}</code></li>
+                <li>Jadwal: pilih <b>minggu</b> (atau harian). Cron diharapkan login admin tidak diperlukan.</li>
+            </ol>
+            <div class="flex flex-col gap-1">
+                <p class="text-[10px] font-semibold text-slate-700">Secret cron Anda (hanya admin yang dapat melihat):</p>
+                <div class="flex gap-2">
+                    <input type="text" id="cron-secret-input" readonly class="flex-1 text-[10px] font-mono p-2 border rounded-lg bg-slate-100" value="(memuat...)">
+                    <button onclick="copyCronSecret()" class="bg-slate-600 hover:bg-slate-700 text-white text-[10px] px-3 py-2 rounded-lg">Salin</button>
+                </div>
+            </div>
+            <p id="auto-backup-status" class="text-[10px] text-slate-500">Memuat status backup otomatis...</p>
+        </div>
+
+        <!-- KEEPALIVE STATUS -->
+        <div class="bg-white p-6 rounded-xl shadow-md border border-slate-200 space-y-3">
+            <h2 class="text-base font-bold text-teal-700 border-b pb-2"><i class="fas fa-heartbeat mr-2"></i>Status Keepalive</h2>
+            <p class="text-xs text-slate-500">Edge Function <code>keepalive</code> dipanggil cron eksternal setiap hari untuk mencegah auto-pause. Jika gagal, cron/monitor akan menandai error.</p>
+            <p id="keepalive-status" class="text-xs text-slate-600">Memuat status...</p>
+        </div>
+
         <!-- RESTORE -->
         <div class="bg-white p-6 rounded-xl shadow-md border border-slate-200 space-y-3">
             <h2 class="text-base font-bold text-amber-700 border-b pb-2"><i class="fas fa-upload mr-2"></i>Restore dari Backup</h2>
@@ -116,6 +144,9 @@
             document.getElementById('header-sekolah').innerText = dbSekolah.nama;
             document.getElementById('header-ta-info').innerText = `T.A: ${dbSekolah.tahunAjaran || '2026/2027'} | Semester: ${dbSekolah.semester || 'Ganjil'}`;
             tampilkanStatusBackupTerakhir();
+            muatStatusKeepalive();
+            muatCronSecret();
+            muatStatusAutoBackup();
         });
 
         function esc(str) {
@@ -312,6 +343,76 @@
             } catch (err) {
                 console.error(err);
                 status.innerText = 'Gagal restore: ' + (err.message || err);
+            }
+        }
+
+        async function muatStatusKeepalive() {
+            const el = document.getElementById('keepalive-status');
+            try {
+                const { data, error } = await sb.from('system_monitor').select('checked_at,status').order('checked_at', { ascending: false }).limit(1);
+                if (error) throw error;
+                const row = (data && data[0]) || null;
+                if (!row) {
+                    el.innerHTML = '<span class="text-amber-600"><i class="fas fa-exclamation-triangle mr-1"></i>Belum ada ping tercatat. Periksa cron eksternal Anda.</span>';
+                    return;
+                }
+                const dt = new Date(row.checked_at);
+                const ageMs = Date.now() - dt.getTime();
+                const hours = Math.floor(ageMs / (1000 * 60 * 60));
+                const days = Math.floor(hours / 24);
+                let label, cls;
+                if (hours < 48) { cls = 'text-emerald-600'; label = 'Sehat (ping ' + (hours < 1 ? 'kurang dari 1 jam' : hours + ' jam') + ' lalu)'; }
+                else if (days < 7) { cls = 'text-amber-600'; label = 'Perhatian (ping ' + days + ' hari lalu)'; }
+                else { cls = 'text-red-600'; label = 'Perlu diperiksa (ping ' + days + ' hari lalu)'; }
+                el.innerHTML = '<span class="' + cls + '"><i class="fas fa-' + (hours < 48 ? 'check-circle' : 'exclamation-triangle') + ' mr-1"></i>' + label + ' — terakhir: ' + dt.toLocaleString('id-ID') + '</span>';
+            } catch (e) {
+                console.error('keepalive status', e);
+                el.innerHTML = '<span class="text-red-600">Gagal memuat status keepalive.</span>';
+            }
+        }
+
+        async function muatCronSecret() {
+            try {
+                const { data, error } = await sb.from('app_secrets').select('value').eq('key', 'cron_backup').maybeSingle();
+                if (error) throw error;
+                const secret = (data && data.value) ? data.value : '(tidak ditemukan)';
+                const input = document.getElementById('cron-secret-input');
+                if (input) input.value = secret;
+                const inline = document.getElementById('cron-secret-inline');
+                if (inline) inline.innerText = secret;
+            } catch (e) {
+                console.error('cron secret', e);
+            }
+        }
+
+        function copyCronSecret() {
+            const input = document.getElementById('cron-secret-input');
+            if (!input) return;
+            input.select();
+            try {
+                document.execCommand('copy');
+                alert('Secret disalin ke clipboard.');
+            } catch (e) {
+                input.setSelectionRange(0, input.value.length);
+                alert('Gagal menyalin otomatis. Pilih & salin manual.');
+            }
+        }
+
+        async function muatStatusAutoBackup() {
+            const el = document.getElementById('auto-backup-status');
+            try {
+                const { data, error } = await sb.from('system_monitor').select('checked_at,detail').like('detail', 'auto backup%').order('checked_at', { ascending: false }).limit(1);
+                if (error) throw error;
+                const row = (data && data[0]) || null;
+                if (!row) {
+                    el.innerHTML = '<span class="text-amber-600"><i class="fas fa-clock mr-1"></i>Belum ada backup otomatis (akan terbuat saat cron pertama dijalankan).</span>';
+                    return;
+                }
+                const dt = new Date(row.checked_at);
+                el.innerHTML = '<span class="text-emerald-600"><i class="fas fa-check-circle mr-1"></i>Backup otomatis terakhir: ' + dt.toLocaleString('id-ID') + ' — ' + escapeHtmlList(row.detail || '') + '</span>';
+            } catch (e) {
+                console.error('auto backup status', e);
+                el.innerText = 'Gagal memuat status backup otomatis.';
             }
         }
 

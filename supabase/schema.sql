@@ -63,7 +63,7 @@ create table if not exists public.rombel (
 -- -------------------------------------------------------------
 create table if not exists public.siswa (
     id             uuid primary key default gen_random_uuid(),
-    nisn           text not null unique,
+    nisn           text not null unique check (nisn ~ '^[0-9]{10}$'),
     nipd           text default '-',
     nama           text not null,
     jk             text not null default 'L' check (jk in ('L', 'P')),
@@ -107,6 +107,25 @@ create table if not exists public.modul_ajar (
 );
 
 -- -------------------------------------------------------------
+-- Tabel: system_monitor (log keepalive/backup otomatis)
+-- -------------------------------------------------------------
+create table if not exists public.system_monitor (
+    id         uuid primary key default gen_random_uuid(),
+    checked_at timestamptz not null default now(),
+    status     text not null default 'ok' check (status in ('ok', 'error')),
+    detail     text default '',
+    created_at timestamptz not null default now()
+);
+
+-- -------------------------------------------------------------
+-- Tabel: app_secrets (rahasia aplikasi, hanya admin yang baca)
+-- -------------------------------------------------------------
+create table if not exists public.app_secrets (
+    key   text primary key,
+    value text not null
+);
+
+-- -------------------------------------------------------------
 -- Tabel: jurnal_mengajar (jurnal mengajar harian guru)
 -- -------------------------------------------------------------
 create table if not exists public.jurnal_mengajar (
@@ -115,10 +134,10 @@ create table if not exists public.jurnal_mengajar (
     rombel_id         uuid not null references public.rombel(id) on delete cascade,
     mapel             text not null default '',
     tanggal           date not null default current_date,
-    jam_ke            text not null default '1-2',
+    jam_ke            text not null default '1-2' check (jam_ke ~ '^[0-9]+[[:space:]]*(-[[:space:]]*[0-9]+[[:space:]]*)?$'),
     tahun_ajaran      text not null default '2025/2026',
     semester          text not null default 'Ganjil' check (semester in ('Ganjil', 'Genap')),
-    materi            text not null,
+    materi            text not null check (length(trim(materi)) > 0),
     kegiatan          text default '',
     kehadiran_ringkas text default '',
     catatan_kejadian  text default '-',
@@ -194,7 +213,7 @@ create table if not exists public.bank_soal (
     opsi_c             text default '',
     opsi_d             text default '',
     kunci              text default '',
-    skor               int not null default 1,
+    skor               int not null default 1 check (skor between 1 and 100),
     tags               text[] not null default '{}',
     sumber             text not null default 'manual' check (sumber in ('manual','otomatis')),
     status             text not null default 'draft' check (status in ('draft','validasi')),
@@ -213,8 +232,8 @@ create table if not exists public.paket_soal_butir (
     id            uuid primary key default gen_random_uuid(),
     paket_id      uuid not null references public.paket_soal(id) on delete cascade,
     butir_id      uuid not null references public.bank_soal(id) on delete restrict,
-    urutan        int not null default 0,
-    skor_override int,
+    urutan        int not null default 0 check (urutan >= 0),
+    skor_override int check (skor_override is null or skor_override between 0 and 100),
     created_at    timestamptz not null default now(),
     unique (paket_id, butir_id)
 );
@@ -569,6 +588,21 @@ create policy read_paket_soal_butir on public.paket_soal_butir for select to aut
 create policy write_paket_soal_butir on public.paket_soal_butir for all to authenticated
     using (exists (select 1 from public.paket_soal p where p.id = paket_soal_butir.paket_id and (p.guru_id = auth.uid() or public.is_admin())))
     with check (exists (select 1 from public.paket_soal p where p.id = paket_soal_butir.paket_id and (p.guru_id = auth.uid() or public.is_admin())));
+
+alter table public.system_monitor enable row level security;
+alter table public.app_secrets enable row level security;
+
+create policy read_system_monitor on public.system_monitor for select to authenticated using (public.is_admin());
+create policy read_app_secrets_admin on public.app_secrets for select to authenticated using (public.is_admin());
+
+-- Bucket storage: sekolah-assets (public, KOP/TTD) dan classcraft-backups (privat, backup otomatis)
+insert into storage.buckets (id, name, public) values ('sekolah-assets', 'sekolah-assets', true) on conflict (id) do nothing;
+insert into storage.buckets (id, name, public) values ('classcraft-backups', 'classcraft-backups', false) on conflict (id) do nothing;
+
+create policy sekolah_assets_read on storage.objects for select to authenticated using (bucket_id = 'sekolah-assets');
+create policy sekolah_assets_insert on storage.objects for insert to authenticated with check (bucket_id = 'sekolah-assets');
+create policy sekolah_assets_update on storage.objects for update to authenticated using (bucket_id = 'sekolah-assets') with check (bucket_id = 'sekolah-assets');
+create policy sekolah_assets_delete on storage.objects for delete to authenticated using (bucket_id = 'sekolah-assets');
 
 -- =============================================================
 -- Data awal (seed): sekolah, guru (+user Auth), rombel, siswa
