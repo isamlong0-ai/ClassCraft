@@ -24,7 +24,8 @@
             <nav class="flex flex-wrap justify-end gap-1 sm:gap-2 text-xs font-medium">
                 <a href="admin-profil.html" class="bg-indigo-900 px-3 py-2 rounded-lg"><i class="fas fa-school mr-1"></i> Profil Sekolah</a>
                 <a href="admin-guru.html" class="hover:bg-indigo-600 px-3 py-2 rounded-lg transition"><i class="fas fa-users-cog mr-1"></i> Data Guru</a>
-                <a href="admin-kelas.html" class="hover:bg-indigo-600 px-3 py-2 rounded-lg transition"><i class="fas fa-door-open mr-1"></i> Kelola Kelas</a>
+                '<a href="admin-kelas.html" class="hover:bg-indigo-600 px-3 py-2 rounded-lg transition"><i class="fas fa-door-open mr-1"></i> Kelola Kelas</a>
+                <a href="admin-backup.html" class="hover:bg-indigo-600 px-3 py-2 rounded-lg transition"><i class="fas fa-database mr-1"></i> Backup & Restore</a>'
                 <button onclick="logout()" class="bg-red-500 hover:bg-red-600 text-white px-3 py-2 rounded-lg transition"><i class="fas fa-sign-out-alt"></i></button>
             </nav>
         </div>
@@ -95,23 +96,6 @@
 
                 <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-2.5 rounded-lg text-sm font-medium transition"><i class="fas fa-save mr-1"></i> Simpan Pengaturan Sekolah</button>
             </form>
-        </div>
-
-        <!-- Panel Backup & Restore Data Sistem -->
-        <div class="bg-white p-6 rounded-xl shadow-md border border-slate-200 space-y-3">
-            <h3 class="text-sm font-bold text-slate-800 border-b pb-2"><i class="fas fa-database mr-2 text-indigo-600"></i>Manajemen Cadangan Data (Backup & Restore)</h3>
-            <p class="text-xs text-slate-500">Gunakan fitur ini untuk mengunduh seluruh data aplikasi ke file JSON atau mengembalikan data saat berpindah komputer.</p>
-            
-            <div class="flex flex-wrap gap-3 pt-2">
-                <button onclick="backupDatabase()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs px-4 py-2 rounded-lg transition font-medium flex items-center gap-1.5">
-                    <i class="fas fa-download"></i> Backup Data Sistem (.json)
-                </button>
-
-                <label class="bg-amber-600 hover:bg-amber-700 text-white text-xs px-4 py-2 rounded-lg transition font-medium cursor-pointer flex items-center gap-1.5">
-                    <i class="fas fa-upload"></i> Restore Data dari File (.json)
-                    <input type="file" accept=".json" onchange="restoreDatabase(this)" class="hidden">
-                </label>
-            </div>
         </div>
 
     </main>
@@ -199,41 +183,6 @@
             } catch (err) {
                 console.error(err);
                 alert('Gagal menyimpan: ' + (err.message || err));
-            }
-        }
-
-        // Fungsi Backup JSON
-        async function backupDatabase() {
-            try {
-                const backupData = await CC.exportAll();
-                const blob = new Blob([JSON.stringify(backupData, null, 2)], { type: 'application/json' });
-                const a = document.createElement('a');
-                a.href = URL.createObjectURL(blob);
-                a.download = `Backup_ClassCraft_SMP_${new Date().toISOString().slice(0,10)}.json`;
-                a.click();
-            } catch (err) {
-                console.error(err);
-                alert('Gagal membuat backup: ' + (err.message || err));
-            }
-        }
-
-        // Fungsi Restore JSON
-        function restoreDatabase(input) {
-            const file = input.files[0];
-            if (file) {
-                const reader = new FileReader();
-                reader.onload = async function(e) {
-                    try {
-                        const data = JSON.parse(e.target.result);
-                        await CC.restoreAll(data);
-                        alert('Restorasi data berhasil!');
-                        location.reload();
-                    } catch (err) {
-                        console.error(err);
-                        alert('Gagal restore: ' + (err.message || err));
-                    }
-                }
-                reader.readAsText(file);
             }
         }
 

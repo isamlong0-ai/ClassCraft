@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin - Backup & Restore Data</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="assets/supabase-config.js"></script>
+    <script src="assets/app-data.js"></script>
+</head>
+<body class="bg-slate-100 font-sans text-slate-800 min-h-screen flex flex-col">
+
+    <header class="bg-indigo-700 text-white shadow-lg sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 py-3 flex flex-wrap justify-between items-center gap-2">
+            <div class="flex items-center space-x-3">
+                <i class="fas fa-shapes text-2xl text-amber-300"></i>
+                <div>
+                    <h1 class="text-lg font-bold" id="header-sekolah">ClassCraft Admin</h1>
+                    <p class="text-[10px] text-indigo-200" id="header-ta-info">T.A: - | Semester: -</p>
+                </div>
+            </div>
+            <nav class="flex flex-wrap justify-end gap-1 sm:gap-2 text-xs font-medium">
+                <a href="admin-profil.html" class="hover:bg-indigo-600 px-3 py-2 rounded-lg transition"><i class="fas fa-school mr-1"></i> Profil Sekolah</a>
+                <a href="admin-guru.html" class="hover:bg-indigo-600 px-3 py-2 rounded-lg transition"><i class="fas fa-users-cog mr-1"></i> Data Guru</a>
+                <a href="admin-kelas.html" class="hover:bg-indigo-600 px-3 py-2 rounded-lg transition"><i class="fas fa-door-open mr-1"></i> Kelola Kelas</a>
+                <a href="admin-backup.html" class="bg-indigo-900 px-3 py-2 rounded-lg"><i class="fas fa-database mr-1"></i> Backup & Restore</a>
+                <button onclick="logout()" class="bg-red-500 hover:bg-red-600 text-white px-3 py-2 rounded-lg transition"><i class="fas fa-sign-out-alt"></i></button>
+            </nav>
+        </div>
+    </header>
+
+    <main class="max-w-4xl mx-auto px-4 py-6 w-full flex-1 space-y-6">
+
+        <!-- BACKUP -->
+        <div class="bg-white p-6 rounded-xl shadow-md border border-slate-200 space-y-3">
+            <h2 class="text-base font-bold text-indigo-700 border-b pb-2"><i class="fas fa-download mr-2"></i>Backup Database & File</h2>
+            <p class="text-xs text-slate-500">Mengunduh seluruh data sistem ke file JSON, termasuk data file KOP/TTD sekolah yang tersimpan di database.</p>
+            <button onclick="backupDatabase()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs px-4 py-2 rounded-lg transition font-medium flex items-center gap-1.5">
+                <i class="fas fa-download"></i> Unduh Backup (.json)
+            </button>
+            <p id="backup-status" class="text-[10px] text-slate-400"></p>
+        </div>
+
+        <!-- RESTORE -->
+        <div class="bg-white p-6 rounded-xl shadow-md border border-slate-200 space-y-3">
+            <h2 class="text-base font-bold text-amber-700 border-b pb-2"><i class="fas fa-upload mr-2"></i>Restore dari Backup</h2>
+            <p class="text-xs text-slate-500">Mengembalikan seluruh data dari file backup (.json). Data yang ada akan tertimpa. Butuh password admin.</p>
+            <div class="flex flex-col sm:flex-row gap-2 items-stretch sm:items-center">
+                <input type="password" id="restore-password" placeholder="Password admin..." class="text-xs p-2 border rounded-lg flex-1">
+                <label class="bg-amber-600 hover:bg-amber-700 text-white text-xs px-4 py-2 rounded-lg transition font-medium cursor-pointer flex items-center gap-1.5 justify-center">
+                    <i class="fas fa-upload"></i> Pilih File & Restore
+                    <input type="file" accept=".json" onchange="restoreDatabase(this)" class="hidden">
+                </label>
+            </div>
+            <p id="restore-status" class="text-[10px] text-slate-400"></p>
+        </div>
+
+        <!-- DANGER ZONE -->
+        <div class="bg-red-50 p-6 rounded-xl shadow-md border border-red-300 space-y-3">
+            <h2 class="text-base font-bold text-red-700 border-b border-red-200 pb-2"><i class="fas fa-trash-alt mr-2"></i>Kosongkan Semua Data (Zona Berbahaya)</h2>
+            <p class="text-xs text-red-600">Menghapus <b>seluruh data sistem</b> (siswa, presensi, jurnal, bank soal, modul ajar, dsb). Data yang terhapus tidak bisa dikembalikan. <b>User admin TIDAK dihapus.</b></p>
+            <div class="flex flex-col sm:flex-row gap-2 items-stretch sm:items-center">
+                <input type="password" id="clear-password" placeholder="Password admin untuk konfirmasi..." class="text-xs p-2 border border-red-300 rounded-lg flex-1">
+                <button onclick="kosongkanSemuaData()" class="bg-red-600 hover:bg-red-700 text-white text-xs px-4 py-2 rounded-lg transition font-medium flex items-center gap-1.5 justify-center">
+                    <i class="fas fa-eraser"></i> Kosongkan Semua Data
+                </button>
+            </div>
+            <p id="clear-status" class="text-[10px] text-red-400"></p>
+        </div>
+
+    </main>
+
+    <script>
+        let session = CC.getSession();
+
+        if (!session) {
+            window.location.replace('index.html');
+            throw new Error('Akses ditolak: silakan login terlebih dahulu.');
+        }
+        if (session.role !== 'admin') {
+            window.location.replace(CC.homeFor(session.role));
+            throw new Error('Akses ditolak: halaman ini khusus admin.');
+        }
+
+        let dbSekolah = Object.assign({}, CC.defaults.sekolah);
+        const sb = CC.client;
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            try {
+                dbSekolah = await CC.getSekolah();
+            } catch (e) {
+                console.error('Gagal memuat profil sekolah:', e);
+            }
+            document.getElementById('header-sekolah').innerText = dbSekolah.nama;
+            document.getElementById('header-ta-info').innerText = `T.A: ${dbSekolah.tahunAjaran || '2026/2027'} | Semester: ${dbSekolah.semester || 'Ganjil'}`;
+        });
+
+        function esc(str) {
+            return String(str == null ? '' : str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        }
+
+        // ---------- Backup ----------
+        async function backupDatabase() {
+            const status = document.getElementById('backup-status');
+            status.innerText = 'Menyusun backup...';
+            const tables = ['sekolah', 'guru', 'rombel', 'siswa', 'anggota_rombel', 'modul_ajar', 'jurnal_mengajar', 'presensi', 'paket_soal_butir', 'bank_soal', 'paket_soal'];
+            const backup = { exportedAt: new Date().toISOString(), app: 'ClassCraft SMP', tables: {} };
+            try {
+                for (const t of tables) {
+                    status.innerText = 'Mengunduh tabel: ' + t + '...';
+                    const { data, error } = await sb.from(t).select('*');
+                    if (error) throw new Error(t + ': ' + error.message);
+                    backup.tables[t] = data || [];
+                }
+                const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
+                const a = document.createElement('a');
+                a.href = URL.createObjectURL(blob);
+                a.download = `Backup_ClassCraft_${new Date().toISOString().slice(0,10)}.json`;
+                a.click();
+                URL.revokeObjectURL(a.href);
+                status.innerText = 'Backup selesai: ' + tables.length + ' tabel terunduh.';
+            } catch (err) {
+                console.error(err);
+                status.innerText = 'Gagal backup: ' + (err.message || err);
+            }
+        }
+
+        // ---------- Restore ----------
+        async function restoreDatabase(input) {
+            const status = document.getElementById('restore-status');
+            const pwd = document.getElementById('restore-password').value.trim();
+            if (!pwd) { alert('Masukkan password admin terlebih dahulu.'); return; }
+            const file = input.files[0];
+            if (!file) return;
+            try {
+                // Verifikasi password admin via re-login
+                const ver = await CC.loginDetailed('admin', pwd);
+                if (!ver || !ver.user) { alert('Password admin salah.'); return; }
+
+                if (!confirm('Restore akan menimpa SEMUA data yang ada. Lanjutkan?')) return;
+
+                status.innerText = 'Membaca file...';
+                const text = await file.text();
+                const data = JSON.parse(text);
+                if (!data || !data.tables) { alert('Format backup tidak valid.'); return; }
+
+                const order = ['sekolah', 'guru', 'rombel', 'siswa', 'anggota_rombel', 'modul_ajar', 'jurnal_mengajar', 'presensi', 'paket_soal_butir', 'bank_soal', 'paket_soal'];
+                // Hapus data lama (urutan aman: anak dulu); admin tidak dihapus
+                const deleteOrder = ['paket_soal_butir', 'paket_soal', 'bank_soal', 'presensi', 'jurnal_mengajar', 'modul_ajar', 'anggota_rombel', 'siswa', 'rombel', 'guru', 'sekolah'];
+                status.innerText = 'Menghapus data lama...';
+                for (const t of deleteOrder) {
+                    const q = (t === 'guru')
+                        ? sb.from(t).delete().neq('role', 'admin')
+                        : sb.from(t).delete().not('id', 'is', null);
+                    const { error } = await q;
+                    if (error) console.error('Hapus ' + t, error);
+                }
+                // Masukkan data backup
+                for (const t of order) {
+                    const rows = data.tables[t] || [];
+                    if (!rows.length) continue;
+                    status.innerText = 'Mengembalikan tabel: ' + t + ' (' + rows.length + ' baris)...';
+                    if (t === 'guru') {
+                        // Admin dipertahankan; upsert agar aman jika sudah ada
+                        const { error } = await sb.from(t).upsert(rows, { onConflict: 'id' });
+                        if (error) {
+                            console.error('Restore ' + t, error);
+                            alert('Sebagian tabel "' + t + '" gagal dikembalikan: ' + error.message);
+                        }
+                    } else {
+                        const { error } = await sb.from(t).insert(rows);
+                        if (error) {
+                            console.error('Restore ' + t, error);
+                            alert('Sebagian tabel "' + t + '" gagal dikembalikan: ' + error.message);
+                        }
+                    }
+                }
+                status.innerText = 'Restore selesai. Memuat ulang...';
+                setTimeout(() => location.reload(), 1000);
+            } catch (err) {
+                console.error(err);
+                status.innerText = 'Gagal restore: ' + (err.message || err);
+            }
+        }
+
+        // ---------- Kosongkan Semua Data ----------
+        async function kosongkanSemuaData() {
+            const status = document.getElementById('clear-status');
+            const pwd = document.getElementById('clear-password').value.trim();
+            if (!pwd) { alert('Masukkan password admin terlebih dahulu.'); return; }
+            if (!confirm('Anda akan MENGHAPUS SEMUA data sistem (siswa, presensi, jurnal, bank soal, dsb). User admin TIDAK dihapus. Lanjutkan?')) return;
+            if (!confirm('Yakin? Tindakan ini TIDAK BISA dibatalkan.')) return;
+
+            try {
+                const ver = await CC.loginDetailed('admin', pwd);
+                if (!ver || !ver.user) { alert('Password admin salah.'); return; }
+
+                status.innerText = 'Menghapus semua data...';
+                const deleteOrder = ['paket_soal_butir', 'paket_soal', 'bank_soal', 'presensi', 'jurnal_mengajar', 'modul_ajar', 'anggota_rombel', 'siswa', 'rombel', 'guru', 'sekolah'];
+                let ok = 0, fail = [];
+                for (const t of deleteOrder) {
+                    let q;
+                    if (t === 'guru') {
+                        // Pertahankan semua user admin
+                        q = sb.from(t).delete().neq('role', 'admin');
+                    } else {
+                        q = sb.from(t).delete().not('id', 'is', null);
+                    }
+                    const { error } = await q;
+                    if (error) { fail.push(t); console.error('Hapus ' + t, error); } else { ok++; }
+                }
+                if (fail.length) {
+                    status.innerText = 'Gagal menghapus: ' + fail.join(', ') + '. Periksa konsol.';
+                } else {
+                    status.innerText = 'Semua data berhasil dikosongkan. Memuat ulang...';
+                    setTimeout(() => location.reload(), 1000);
+                }
+            } catch (err) {
+                console.error(err);
+                status.innerText = 'Gagal mengosongkan data: ' + (err.message || err);
+            }
+        }
+
+        function logout() {
+            CC.logout().finally(() => { window.location.href = 'index.html'; });
+        }
+    </script>
+</body>
+</html>
