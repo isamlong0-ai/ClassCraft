@@ -65,13 +65,14 @@
                 </label>
             </div>
             <p id="restore-status" class="text-[10px] text-slate-400"></p>
+            <div id="auth-restore-result" class="hidden bg-emerald-50 border border-emerald-200 rounded-lg p-3 space-y-2 text-[10px]"></div>
             <details class="text-[10px] text-slate-600">
-                <summary class="cursor-pointer font-semibold text-amber-700">Cara restore lengkap di proyek baru</summary>
+                <summary class="cursor-pointer font-semibold text-amber-700">Cara kerja restore di proyek baru</summary>
                 <ol class="mt-1 ml-4 list-decimal space-y-0.5">
-                    <li>Buat user Auth di Dashboard Supabase → Authentication → Add User, untuk setiap username pada file backup (<code>authUsers</code>). Email = <code>username@classcraft.local</code>. Atur password sementara.</li>
-                    <li>Isi tabel <code>guru</code>: insert baris dari backup (ID harus sama dengan Auth user yang dibuat).</li>
-                    <li>Kelola restore ini: masuk sebagai admin, pilih file backup, lalu klik Restore. File restore akan membuat sisa data.</li>
-                    <li>Password tidak bisa dipulihkan; setiap user harus reset password (Dashboard atau fitur Reset Password).</li>
+                    <li>Masuk sebagai admin, upload file backup, masukkan password admin, klik <b>Pilih File & Restore</b>.</li>
+                    <li>Halaman akan otomatis memanggil Edge Function <code>restore-auth-users</code> untuk membuat/mengisi Auth user (email = <code>username@classcraft.local</code>), dengan password sementara acak; hasil & password ditampilkan di bawah.</li>
+                    <li>Baru setelah itu data sekolah/guru/siswa/rombel/dsb di-restore.</li>
+                    <li>Password sementara wajib diberikan kepada masing-masing guru; setelah itu guru dapat reset lewat fitur Lupa Password.</li>
                 </ol>
             </details>
         </div>
@@ -119,6 +120,13 @@
 
         function esc(str) {
             return String(str == null ? '' : str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        }
+        function escapeHtmlList(str) {
+            return String(str == null ? '' : str)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;');
         }
 
         // ---------- Backup ----------
@@ -198,6 +206,54 @@
                 const text = await file.text();
                 const data = JSON.parse(text);
                 if (!data || !data.tables) { alert('Format backup tidak valid.'); return; }
+
+                // Restore Auth user lebih dulu (via Edge Function admin-only)
+                if (Array.isArray(data.tables.guru) && data.tables.guru.length) {
+                    status.innerText = 'Menyiapkan Auth user...';
+                    const { data: sessData } = await sb.auth.getSession();
+                    const token = sessData && sessData.session && sessData.session.access_token;
+                    if (!token) { alert('Sesi admin tidak valid. Login ulang sebagai admin.'); return; }
+                    const authUsers = data.tables.guru.map(g => ({
+                        id: g.id,
+                        username: g.username,
+                        role: g.role,
+                        nama: g.nama,
+                        mapel: g.mapel,
+                        pangkat: g.pangkat,
+                        gol: g.gol,
+                        aktif: g.aktif,
+                        email: String(g.username || '').toLowerCase() + '@classcraft.local'
+                    }));
+                    try {
+                        const { data: result, error } = await sb.functions.invoke('restore-auth-users', { body: { users: authUsers } });
+                        if (error || !result || result.error) {
+                            console.error('restore-auth-users', result || error);
+                            alert('Gagal menyiapkan Auth user: ' + ((result && result.error) || (error && error.message) || 'unknown'));
+                            return;
+                        }
+                        const list = Array.isArray(result.results) ? result.results : [];
+                        const created = list.filter(r => r.status === 'created');
+                        const exists = list.filter(r => r.status === 'exists');
+                        const failed = list.filter(r => r.status === 'failed');
+                        const box = document.getElementById('auth-restore-result');
+                        let html = '<div class="font-bold text-emerald-800"><i class="fas fa-user-check mr-1"></i> Auth user berhasil dikelola</div>';
+                        html += '<p>Dibuat: ' + created.length + ' | Sudah ada (tidak diubah): ' + exists.length + ' | Gagal: ' + failed.length + '</p>';
+                        if (created.length) {
+                            html += '<p class="font-semibold text-amber-800">Password sementara (berikan ke guru masing-masing):</p>';
+                            html += '<textarea readonly rows="8" class="w-full font-mono text-[10px] border rounded p-2 bg-white">' + escapeHtmlList(created.map(r => r.username + ': ' + r.password).join('\n')) + '</textarea>';
+                            html += '<p class="text-[9px] text-slate-500">Salin & berikan ke guru. Password tidak disimpan setelah halaman dimuat ulang.</p>';
+                        }
+                        if (failed.length) {
+                            html += '<p class="text-[9px] text-red-600">Gagal: ' + escapeHtmlList(failed.map(r => r.username + ' (' + (r.reason || 'error') + ')').join('; ')) + '</p>';
+                        }
+                        box.innerHTML = html;
+                        box.classList.remove('hidden');
+                    } catch (e) {
+                        console.error(e);
+                        alert('Gagal memanggil restore-auth-users. Periksa koneksi/konsol.');
+                        return;
+                    }
+                }
 
                 // Re-upload file storage terlebih dahulu (KOP/TTD)
                 if (Array.isArray(data.files) && data.files.length) {
