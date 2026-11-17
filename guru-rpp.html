@@ -358,17 +358,17 @@ Peserta didik mampu menginisiasi kegiatan bersama dalam merawat keberagaman suku
             listElemen.forEach((el, eIdx) => {
                 el.tpList.forEach((tp) => {
                     modulSection += `
-                        <div class="border border-slate-300 rounded-lg p-4 space-y-3 bg-slate-50/50">
+                        <div class="border border-slate-300 rounded-lg p-4 space-y-3 bg-slate-50/50 break-inside-avoid">
                             <div class="border-b pb-2 flex justify-between items-center">
                                 <h4 class="font-bold text-indigo-800 uppercase text-xs"><i class="fas fa-bookmark mr-1"></i> Modul Ajar: ${escapeHtml(tp.kode)} - ${escapeHtml(el.nama)}</h4>
                                 <span class="bg-indigo-100 text-indigo-700 font-bold px-2 py-0.5 rounded text-[10px]">${escapeHtml(waktu)}</span>
                             </div>
 
                             <table class="w-full text-xs border-collapse border bg-white">
-                                <tr><td class="p-1.5 border font-semibold w-1/3">Elemen Pembelajaran</td><td class="p-1.5 border">${escapeHtml(el.nama)}</td></tr>
-                                <tr><td class="p-1.5 border font-semibold">Tujuan Pembelajaran (TP)</td><td class="p-1.5 border">${escapeHtml(tp.deskripsi)}</td></tr>
-                                <tr><td class="p-1.5 border font-semibold">Model Pembelajaran</td><td class="p-1.5 border">${escapeHtml(model)}</td></tr>
-                                <tr><td class="p-1.5 border font-semibold">Dimensi P3</td><td class="p-1.5 border">${escapeHtml(tp.p3)}</td></tr>
+                                <tr><td class="p-1.5 border font-semibold w-1/3" style="width:30%">Elemen Pembelajaran</td><td class="p-1.5 border" style="width:70%">${escapeHtml(el.nama)}</td></tr>
+                                <tr><td class="p-1.5 border font-semibold" style="width:30%">Tujuan Pembelajaran (TP)</td><td class="p-1.5 border" style="width:70%">${escapeHtml(tp.deskripsi)}</td></tr>
+                                <tr><td class="p-1.5 border font-semibold" style="width:30%">Model Pembelajaran</td><td class="p-1.5 border" style="width:70%">${escapeHtml(model)}</td></tr>
+                                <tr><td class="p-1.5 border font-semibold" style="width:30%">Dimensi P3</td><td class="p-1.5 border" style="width:70%">${escapeHtml(tp.p3)}</td></tr>
                             </table>
 
                             <div class="bg-white p-3 border rounded text-xs space-y-1.5">

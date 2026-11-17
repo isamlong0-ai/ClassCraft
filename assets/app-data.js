@@ -589,12 +589,12 @@
             return;
         }
         var css = [
-            '@page { size: 215mm 330mm; margin: 0; }',
+            '@page { size: 215mm 330mm; margin: 12mm 12mm 14mm 12mm; }',
             'html, body { margin: 0; padding: 0; background: #fff; }',
             docBaseCss(),
-            '.doc { padding: 12mm 12mm 14mm; }',
+            '.doc { padding: 0; }',
             '.doc .kop-wrap { margin: -12mm -12mm 6pt; }',
-            '@media screen { body { background: #e5e7eb; } .doc { width: 215mm; min-height: 297mm; margin: 0 auto; background: #fff; box-shadow: 0 0 10px rgba(0,0,0,.25); } }'
+            '@media screen { body { background: #e5e7eb; } .doc { width: 215mm; min-height: 297mm; margin: 0 auto; background: #fff; box-shadow: 0 0 10px rgba(0,0,0,.25); padding: 12mm 12mm 14mm; } }'
         ].join('\n');
         var head = '<!DOCTYPE html><html lang="id"><head><meta charset="UTF-8">' +
             '<title>' + (judul || 'Cetak Dokumen') + '</title>' +
