@@ -533,7 +533,8 @@ create policy admin_guru    on public.guru       for all to authenticated using 
 create policy admin_rombel  on public.rombel     for all to authenticated using (public.is_admin()) with check (public.is_admin());
 create policy admin_siswa   on public.siswa      for all to authenticated using (public.is_admin()) with check (public.is_admin());
 create policy admin_anggota_rombel on public.anggota_rombel for all to authenticated using (public.is_admin()) with check (public.is_admin());
-create policy write_modul   on public.modul_ajar for all to authenticated using (true) with check (true);
+create policy write_modul   on public.modul_ajar for all to authenticated
+    using (guru_id = auth.uid() or public.is_admin()) with check (guru_id = auth.uid() or public.is_admin());
 
 -- Modul jurnal/presensi/paket soal: baca untuk user login,
 -- tulis hanya oleh pemilik data (guru_id = auth.uid()) atau admin.
