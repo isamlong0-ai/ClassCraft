@@ -220,10 +220,6 @@
         function exportExcel() {
             const list = dbUsers.filter(u => u.role === 'guru');
 
-            const kop = dbSekolah.imgKop
-                ? `<div class="kop-wrap text-center"><img src="${dbSekolah.imgKop}" class="kop-img"></div>`
-                : `<div class="kop-wrap"><div class="kop-text"><h2>${dbSekolah.nama}</h2><p>NPSN: ${dbSekolah.npsn || '-'}</p></div></div>`;
-
             let rows = '';
             list.forEach(g => {
                 rows += `<tr>
@@ -236,7 +232,6 @@
             });
 
             const content = `
-                ${kop}
                 <h3>DATA GURU</h3>
                 <table class="border">
                     <thead><tr><th>NIP</th><th>Nama</th><th>Mapel</th><th>Pangkat</th><th>Golongan</th></tr></thead>

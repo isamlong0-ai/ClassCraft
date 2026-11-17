@@ -461,7 +461,7 @@ Peserta didik mampu menginisiasi kegiatan bersama dalam merawat keberagaman suku
         }
 
         function exportDoc(elemId, filename = 'Dokumen_Perangkat_Ajar') {
-            CC.exportWord(document.getElementById(elemId).innerHTML, filename);
+            CC.exportWord(elemId, filename);
         }
 
         function logout() {

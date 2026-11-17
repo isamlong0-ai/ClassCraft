@@ -955,13 +955,11 @@
         }
 
         function exportWord(elemId, filename) {
-            CC.exportWord(document.getElementById(elemId).innerHTML,
-                `${filename}_${new Date().toISOString().slice(0, 10)}`);
+            CC.exportWord(elemId, `${filename}_${new Date().toISOString().slice(0, 10)}`);
         }
 
         function exportExcel(elemId, filename) {
-            CC.exportExcel(document.getElementById(elemId).innerHTML,
-                `${filename}_${new Date().toISOString().slice(0, 10)}`);
+            CC.exportExcel(elemId, `${filename}_${new Date().toISOString().slice(0, 10)}`);
         }
 
         function cetakDokumen(elemId, judul) {

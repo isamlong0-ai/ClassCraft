@@ -602,14 +602,82 @@
         setTimeout(function () { try { win.focus(); win.print(); } catch (e) {} }, 900);
     }
 
-    // Ekspor Word (.doc) berformat F4 dengan kop full-bleed, judul, paragraf,
-    // dan tabel yang sudah distyling level-elemen (tidak bergantung Tailwind).
-    function exportWord(contentHTML, filename) {
+    // Word & Excel mengabaikan kelas Tailwind. Agar tampilan hasil ekspor
+    // mendekati tampilan HTML/PDF, gaya hasil render (computed style) disalin
+    // menjadi inline style. Kop dan ikon dibuang agar dokumen ekspor bersih.
+    // Lebar/tinggi piksel sengaja tidak disalin agar tabel mengikuti lebar
+    // halaman Word/Excel (100%) dan tidak meluber ke luar kertas.
+    var EXPORT_STYLE_PROPS = [
+        'font-size', 'font-weight', 'font-style', 'text-decoration', 'text-transform',
+        'text-align', 'vertical-align', 'color', 'background-color',
+        'white-space', 'line-height', 'letter-spacing',
+        'padding-top', 'padding-right', 'padding-bottom', 'padding-left',
+        'border-top', 'border-right', 'border-bottom', 'border-left',
+        'border-collapse'
+    ];
+    var EXPORT_DROP_SELECTOR = '.kop-wrap, .no-export, .no-print, i.fa, i.fas, i.far, i.fab, button, select, input, textarea';
+
+    // Salin gaya hasil render ke salinan elemen (tanpa kop/ikon/kontrol form).
+    function buildExportClone(el) {
+        if (!el) return null;
+        var clone = el.cloneNode(true);
+        var origAll = [el].concat(Array.prototype.slice.call(el.querySelectorAll('*')));
+        var cloneAll = [clone].concat(Array.prototype.slice.call(clone.querySelectorAll('*')));
+        for (var i = 0; i < origAll.length && i < cloneAll.length; i++) {
+            var cs = window.getComputedStyle(origAll[i]);
+            var s = '';
+            for (var p = 0; p < EXPORT_STYLE_PROPS.length; p++) {
+                var prop = EXPORT_STYLE_PROPS[p];
+                var v = cs.getPropertyValue(prop);
+                if (!v) continue;
+                if (v === 'normal' || v === 'auto' || v === 'none' || v === '0px' ||
+                    v === 'rgba(0, 0, 0, 0)' || v === 'transparent') continue;
+                // Buang border tanpa ketebalan (0px) agar tidak menambah bingkai palsu.
+                if (prop.indexOf('border-') === 0 && /^0(px|pt|em|rem)?\b/.test(v)) continue;
+                // Normalisasi nilai logis agar dikenali Word/Excel.
+                if (v === 'start') v = 'left';
+                else if (v === 'end') v = 'right';
+                s += prop + ':' + v + ';';
+            }
+            if (s) cloneAll[i].setAttribute('style', s + (cloneAll[i].getAttribute('style') || ''));
+        }
+        var drop = clone.querySelectorAll(EXPORT_DROP_SELECTOR);
+        for (var d = 0; d < drop.length; d++) {
+            if (drop[d].parentNode) drop[d].parentNode.removeChild(drop[d]);
+        }
+        return clone;
+    }
+
+    // Siapkan HTML ekspor. Bila target elemen (atau id elemen), gaya hasil
+    // render disalin jadi inline style. Bila HTML string, dipakai apa adanya
+    // (styling mengandalkan aturan dasar dokumen).
+    function resolveExportHTML(target) {
+        var node = null;
+        if (target && target.nodeType === 1) node = target;
+        else if (typeof target === 'string' && document.getElementById(target)) {
+            node = document.getElementById(target);
+        }
+        if (node) {
+            var clone = buildExportClone(node);
+            return clone ? clone.outerHTML : '';
+        }
+        return typeof target === 'string' ? target : '';
+    }
+
+    // Ekspor Word (.doc) berformat F4. Kop dibuang; konten memakai gaya inline
+    // hasil render agar mirip tampilan HTML/PDF.
+    function exportWord(target, filename) {
+        var contentHTML = resolveExportHTML(target);
         var css = [
-            '@page WordSection1 { size: 215mm 330mm; margin: 0; }',
-            'div.WordSection1 { page: WordSection1; padding: 12mm 12mm 14mm; }',
-            'div.WordSection1 .kop-wrap { margin: -12mm -12mm 6pt; }',
-            docBaseCss()
+            '@page WordSection1 { size: 215mm 330mm; margin: 12mm; }',
+            'div.WordSection1 { page: WordSection1; }',
+            'body { font-family: Arial, Helvetica, sans-serif; font-size: 11pt; color: #000; }',
+            'h1, h2, h3, h4 { text-align: center; font-weight: bold; margin: 0 0 6pt; }',
+            'table { border-collapse: collapse; width: 100%; }',
+            'p { margin: 0 0 6pt; }',
+            'table.border, table.border th, table.border td, table[border] th, table[border] td { border: 1px solid #000; }',
+            'table.border th, table[border] th { background: #eef2ff; text-align: center; }',
+            'table.ttd, table.ttd td { border: none; text-align: center; }'
         ].join('\n');
         var html = "<html xmlns:o='urn:schemas-microsoft-com:office:office' " +
             "xmlns:w='urn:schemas-microsoft-com:office:word' " +
@@ -626,14 +694,18 @@
         document.body.removeChild(a);
     }
 
-    // Ekspor Excel (.xls) dari HTML dokumen. Tabel ber-border tetap rapi dan
-    // kop ikut disertakan. Ukuran kertas tetap F4.
-    function exportExcel(contentHTML, filename) {
+    // Ekspor Excel (.xls) berformat F4. Kop dibuang; gaya hasil render disalin
+    // menjadi inline style. Ukuran kertas tetap F4.
+    function exportExcel(target, filename) {
+        var contentHTML = resolveExportHTML(target);
         var css = [
             '@page { size: 215mm 330mm; margin: 10mm; }',
-            docBaseCss(),
-            'body { font-size: 10pt; }',
-            'td, th { padding: 3pt 5pt; }'
+            'body { font-family: Arial, sans-serif; font-size: 10pt; }',
+            'h1, h2, h3, h4 { text-align: center; font-weight: bold; }',
+            'table { border-collapse: collapse; width: 100%; }',
+            'th, td { vertical-align: top; }',
+            'table.border, table.border th, table.border td, table[border] th, table[border] td { border: 1px solid #000; }',
+            'table.border th, table[border] th { background: #eef2ff; text-align: center; }'
         ].join('\n');
         var excelHead = "<!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets>" +
             '<x:ExcelWorksheet><x:Name>Laporan</x:Name><x:WorksheetOptions>' +

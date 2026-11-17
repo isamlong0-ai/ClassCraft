@@ -46,11 +46,26 @@
                 </button>
             </div>
 
+            <!-- Pemilih Periode (Tahun Ajaran & Semester) untuk input, riwayat, dan laporan -->
+            <div class="flex flex-wrap items-center gap-3 bg-indigo-50 border-b border-indigo-100 px-6 py-3 text-xs">
+                <span class="font-bold text-indigo-700"><i class="fas fa-calendar-alt mr-1"></i> Periode Jurnal:</span>
+                <label class="font-bold text-slate-700">Tahun Ajaran:</label>
+                <select id="jurnal-ta" onchange="gantiPeriodeJurnal()" class="p-2 border rounded-lg bg-white font-semibold text-indigo-700"></select>
+                <label class="font-bold text-slate-700">Semester:</label>
+                <select id="jurnal-semester" onchange="gantiPeriodeJurnal()" class="p-2 border rounded-lg bg-white font-semibold text-indigo-700">
+                    <option value="Ganjil">Ganjil</option>
+                    <option value="Genap">Genap</option>
+                </select>
+                <span id="jurnal-arsip-badge" class="hidden ml-auto text-amber-800 bg-amber-100 border border-amber-200 px-2.5 py-1 rounded-lg">
+                    <i class="fas fa-lock mr-1"></i> Mode arsip tahun ajaran lama — hanya dapat dilihat
+                </span>
+            </div>
+
             <!-- SUB-TAB 1: FORM INPUT & DAFTAR JURNAL -->
             <div id="panel-input" class="p-6 space-y-6">
                 
                 <!-- Form Jurnal -->
-                <div class="bg-slate-50 p-5 rounded-xl border border-slate-200 space-y-4">
+                <div id="box-form-jurnal" class="bg-slate-50 p-5 rounded-xl border border-slate-200 space-y-4">
                     <div class="flex justify-between items-center border-b pb-2">
                         <h2 class="text-sm font-bold text-indigo-700" id="form-judul">
                             <i class="fas fa-plus-circle mr-1"></i> Catat Jurnal Mengajar Harian
@@ -101,7 +116,7 @@
                                         <i class="fas fa-sync-alt mr-1"></i> Tarik Data Absensi
                                     </button>
                                 </div>
-                                <input type="text" id="jurnal-kehadiran" placeholder="Klik 'Tarik Data Absensi' atau isi manual (misal: Hadir 30, Sakit 1)" class="w-full p-2.5 border rounded-lg bg-white">
+                                <textarea id="jurnal-kehadiran" rows="4" placeholder="Hadir: 30&#10;Izin: 0&#10;Sakit: 1&#10;Alpa: 0" class="w-full p-2.5 border rounded-lg bg-white font-mono text-[11px]"></textarea>
                             </div>
                             <div>
                                 <label class="block font-bold text-slate-700 mb-1">Catatan Kejadian Khusus / Sikap Siswa</label>
@@ -120,7 +135,7 @@
                 <!-- Tabel Riwayat Jurnal Semester Aktif -->
                 <div class="space-y-3">
                     <div class="flex flex-wrap justify-between items-center gap-2 border-b pb-2">
-                        <h3 class="text-sm font-bold text-slate-800"><i class="fas fa-history mr-1 text-indigo-600"></i> Riwayat Jurnal Semester Aktif</h3>
+                        <h3 class="text-sm font-bold text-slate-800" id="judul-riwayat"><i class="fas fa-history mr-1 text-indigo-600"></i> Riwayat Jurnal</h3>
                         <select id="filter-riwayat-rombel" onchange="renderTabelRiwayat()" class="p-1.5 border rounded-lg text-xs bg-slate-50 font-medium">
                             <option value="ALL">Semua Kelas</option>
                         </select>
@@ -157,7 +172,7 @@
 
                         <label class="font-bold text-slate-700 ml-2">Periode:</label>
                         <select id="lap-periode" onchange="renderLaporanSupervisi()" class="p-2 border rounded-lg bg-slate-50 font-medium">
-                            <option value="SEMESTER">Seluruh Semester Aktif</option>
+                            <option value="SEMESTER">Seluruh Semester</option>
                             <option value="01">Januari</option>
                             <option value="02">Februari</option>
                             <option value="03">Maret</option>
@@ -260,6 +275,9 @@
         let profilSekolah = null;
         let daftarRombel = [];
         let daftarJurnal = [];
+        let daftarTAJurnal = [];
+        let taJurnal = '';
+        let semesterJurnal = '';
 
         function esc(v) {
             return String(v == null ? '' : v)
@@ -326,7 +344,7 @@
             document.getElementById('header-sekolah').innerText = profilSekolah.nama;
             document.getElementById('header-info').innerText = `${profilGuru.nama} | T.A. ${profilSekolah.tahun_ajaran} (${profilSekolah.semester})`;
 
-            // 3. Muat Daftar Rombel Tahun Ajaran Aktif
+            // 3. Muat Daftar Rombel Tahun Ajaran Aktif (untuk form input)
             const { data: rombelData } = await sb
                 .from('rombel')
                 .select('*')
@@ -335,27 +353,85 @@
 
             daftarRombel = rombelData || [];
             const selForm = document.getElementById('jurnal-rombel');
-            const selRiwayat = document.getElementById('filter-riwayat-rombel');
-            const selLap = document.getElementById('lap-rombel');
-
             selForm.innerHTML = '';
             daftarRombel.forEach(r => {
                 selForm.innerHTML += `<option value="${esc(r.id)}">${esc(r.tingkat)} - Kelas ${esc(r.nama)}</option>`;
-                selRiwayat.innerHTML += `<option value="${esc(r.id)}">Kelas ${esc(r.nama)}</option>`;
-                selLap.innerHTML += `<option value="${esc(r.id)}">Kelas ${esc(r.nama)} (${esc(r.tingkat)})</option>`;
             });
 
-            // 4. Muat Riwayat Jurnal Mengajar
-            await muatDaftarJurnal();
+            // 4. Susun daftar Tahun Ajaran (histori) dari jurnal, rombel, dan TA aktif
+            const [jurnalTA, rombelTA] = await Promise.all([
+                sb.from('jurnal_mengajar').select('tahun_ajaran').eq('guru_id', profilGuru.id),
+                sb.from('rombel').select('tahun_ajaran')
+            ]);
+            const setTA = {};
+            (jurnalTA.data || []).forEach(r => { if (r.tahun_ajaran) setTA[r.tahun_ajaran] = true; });
+            (rombelTA.data || []).forEach(r => { if (r.tahun_ajaran) setTA[r.tahun_ajaran] = true; });
+            if (profilSekolah.tahun_ajaran) setTA[profilSekolah.tahun_ajaran] = true;
+            daftarTAJurnal = Object.keys(setTA).sort();
+            if (daftarTAJurnal.length === 0) daftarTAJurnal = [profilSekolah.tahun_ajaran];
+
+            const selTA = document.getElementById('jurnal-ta');
+            selTA.innerHTML = daftarTAJurnal.map(ta => `<option value="${esc(ta)}">${esc(ta)}</option>`).join('');
+            selTA.value = profilSekolah.tahun_ajaran;
+            document.getElementById('jurnal-semester').value = profilSekolah.semester;
+
+            taJurnal = profilSekolah.tahun_ajaran;
+            semesterJurnal = profilSekolah.semester;
+
+            // 5. Muat riwayat jurnal & laporan untuk periode terpilih
+            await muatPeriodeJurnal();
         });
+
+        // Apakah periode terpilih adalah arsip (bukan TA + semester aktif)?
+        function isArsipJurnal() {
+            return taJurnal !== (profilSekolah.tahun_ajaran || '') ||
+                semesterJurnal !== (profilSekolah.semester || '');
+        }
+
+        async function gantiPeriodeJurnal() {
+            taJurnal = document.getElementById('jurnal-ta').value;
+            semesterJurnal = document.getElementById('jurnal-semester').value;
+            await muatPeriodeJurnal();
+        }
+
+        // Muat rombel periode, riwayat jurnal, dan laporan sesuai TA + semester.
+        // TA lama = mode arsip (form input disembunyikan).
+        async function muatPeriodeJurnal() {
+            const arsip = isArsipJurnal();
+            document.getElementById('jurnal-arsip-badge').classList.toggle('hidden', !arsip);
+            document.getElementById('box-form-jurnal').classList.toggle('hidden', arsip);
+            document.getElementById('judul-riwayat').innerHTML =
+                `<i class="fas fa-history mr-1 text-indigo-600"></i> Riwayat Jurnal T.A. ${esc(taJurnal)} — Semester ${esc(semesterJurnal)}${arsip ? ' (Arsip)' : ''}`;
+
+            // Rombel periode terpilih untuk filter riwayat & laporan
+            const { data: rb } = await sb
+                .from('rombel')
+                .select('id,nama,tingkat')
+                .eq('tahun_ajaran', taJurnal)
+                .order('nama', { ascending: true });
+            const rombelPeriode = rb || [];
+
+            const selRiwayat = document.getElementById('filter-riwayat-rombel');
+            const selLap = document.getElementById('lap-rombel');
+            const keepRiwayat = selRiwayat.value;
+            const keepLap = selLap.value;
+            selRiwayat.innerHTML = '<option value="ALL">Semua Kelas</option>' +
+                rombelPeriode.map(r => `<option value="${esc(r.id)}">Kelas ${esc(r.nama)}</option>`).join('');
+            selLap.innerHTML = '<option value="ALL">Semua Kelas Diampu</option>' +
+                rombelPeriode.map(r => `<option value="${esc(r.id)}">Kelas ${esc(r.nama)} (${esc(r.tingkat)})</option>`).join('');
+            if (Array.from(selRiwayat.options).some(o => o.value === keepRiwayat)) selRiwayat.value = keepRiwayat;
+            if (Array.from(selLap.options).some(o => o.value === keepLap)) selLap.value = keepLap;
+
+            await muatDaftarJurnal();
+        }
 
         async function muatDaftarJurnal() {
             const { data, error } = await sb
                 .from('jurnal_mengajar')
                 .select('*, rombel(nama, tingkat)')
                 .eq('guru_id', profilGuru.id)
-                .eq('tahun_ajaran', profilSekolah.tahun_ajaran)
-                .eq('semester', profilSekolah.semester)
+                .eq('tahun_ajaran', taJurnal)
+                .eq('semester', semesterJurnal)
                 .order('tanggal', { ascending: false })
                 .order('jam_ke', { ascending: false });
 
@@ -390,7 +466,7 @@
 
             let query = sb
                 .from('presensi')
-                .select('status, siswa(nama)')
+                .select('status')
                 .eq('rombel_id', rombelId)
                 .eq('tanggal', tanggal);
 
@@ -409,30 +485,27 @@
                 return;
             }
 
-            let h = 0;
-            const sakit = [], izin = [], alpa = [];
-
+            let h = 0, s = 0, i = 0, a = 0;
             data.forEach(row => {
-                const namaSiswa = row.siswa ? row.siswa.nama : 'Siswa';
                 if (row.status === 'H') h++;
-                else if (row.status === 'S') sakit.push(namaSiswa);
-                else if (row.status === 'I') izin.push(namaSiswa);
-                else if (row.status === 'A') alpa.push(namaSiswa);
+                else if (row.status === 'S') s++;
+                else if (row.status === 'I') i++;
+                else if (row.status === 'A') a++;
             });
 
-            const bagian = [`Hadir: ${h}`];
-            if (sakit.length > 0) bagian.push(`Sakit: ${sakit.length} (${sakit.join(', ')})`);
-            if (izin.length > 0) bagian.push(`Izin: ${izin.length} (${izin.join(', ')})`);
-            if (alpa.length > 0) bagian.push(`Alpa: ${alpa.length} (${alpa.join(', ')})`);
-            if (sakit.length === 0 && izin.length === 0 && alpa.length === 0) {
-                bagian.push('Nihil (Hadir Semua)');
-            }
-
-            document.getElementById('jurnal-kehadiran').value = bagian.join(' | ');
+            // Ringkasan disusun ke bawah: Hadir, Izin, Sakit, Alpa (hanya jumlah).
+            const ringkas = `Hadir: ${h}\nIzin: ${i}\nSakit: ${s}\nAlpa: ${a}`;
+            document.getElementById('jurnal-kehadiran').value = ringkas;
         }
 
         async function simpanJurnal(e) {
             e.preventDefault();
+
+            if (isArsipJurnal()) {
+                alert('Mode arsip: jurnal tahun ajaran lama hanya dapat dilihat, tidak dapat diubah.');
+                return;
+            }
+
             const editId = document.getElementById('edit-jurnal-id').value;
             const btn = document.getElementById('btn-simpan-jurnal');
 
@@ -442,8 +515,8 @@
                 tanggal: document.getElementById('jurnal-tanggal').value,
                 jam_ke: document.getElementById('jurnal-jam').value.trim(),
                 mapel: document.getElementById('jurnal-mapel').value.trim(),
-                tahun_ajaran: profilSekolah.tahun_ajaran,
-                semester: profilSekolah.semester,
+                tahun_ajaran: taJurnal,
+                semester: semesterJurnal,
                 materi: document.getElementById('jurnal-materi').value.trim(),
                 kegiatan: document.getElementById('jurnal-kegiatan').value.trim(),
                 kehadiran_ringkas: document.getElementById('jurnal-kehadiran').value.trim(),
@@ -479,17 +552,26 @@
         function renderTabelRiwayat() {
             const filterRombel = document.getElementById('filter-riwayat-rombel').value;
             const tbody = document.getElementById('tbody-riwayat');
+            const arsip = isArsipJurnal();
 
             const filtered = daftarJurnal.filter(j => filterRombel === 'ALL' || j.rombel_id === filterRombel);
 
             if (filtered.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="5" class="text-center p-6 text-slate-400">Belum ada catatan jurnal mengajar pada semester ini.</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="5" class="text-center p-6 text-slate-400">Belum ada catatan jurnal mengajar pada periode ini.</td></tr>`;
                 return;
             }
 
             tbody.innerHTML = '';
             filtered.forEach(j => {
                 const namaKelas = j.rombel ? j.rombel.nama : '-';
+                const aksi = arsip
+                    ? `<span class="text-slate-400 text-[11px]">Arsip</span>`
+                    : `<button onclick="editJurnal('${j.id}')" title="Edit" class="bg-amber-500 hover:bg-amber-600 text-white px-2 py-1 rounded text-[10px]">
+                            <i class="fas fa-edit"></i>
+                       </button>
+                       <button onclick="hapusJurnal('${j.id}')" title="Hapus" class="bg-red-500 hover:bg-red-600 text-white px-2 py-1 rounded text-[10px]">
+                            <i class="fas fa-trash"></i>
+                       </button>`;
                 tbody.innerHTML += `
                     <tr class="hover:bg-slate-50 align-top">
                         <td class="p-2.5 font-medium text-slate-700">${formatTanggalIndo(j.tanggal)}</td>
@@ -502,23 +584,17 @@
                             ${j.kegiatan ? `<div class="text-[11px] text-slate-500 mt-1">${esc(j.kegiatan)}</div>` : ''}
                         </td>
                         <td class="p-2.5 text-[11px]">
-                            <div class="text-emerald-700 font-medium">${esc(j.kehadiran_ringkas) || '-'}</div>
+                            <div class="text-emerald-700 font-medium" style="white-space:pre-line">${esc(j.kehadiran_ringkas) || '-'}</div>
                             <div class="text-slate-500 mt-0.5">Catatan: ${esc(j.catatan_kejadian) || '-'}</div>
                         </td>
-                        <td class="p-2.5 text-center space-x-1">
-                            <button onclick="editJurnal('${j.id}')" title="Edit" class="bg-amber-500 hover:bg-amber-600 text-white px-2 py-1 rounded text-[10px]">
-                                <i class="fas fa-edit"></i>
-                            </button>
-                            <button onclick="hapusJurnal('${j.id}')" title="Hapus" class="bg-red-500 hover:bg-red-600 text-white px-2 py-1 rounded text-[10px]">
-                                <i class="fas fa-trash"></i>
-                            </button>
-                        </td>
+                        <td class="p-2.5 text-center space-x-1">${aksi}</td>
                     </tr>
                 `;
             });
         }
 
         function editJurnal(id) {
+            if (isArsipJurnal()) { alert('Mode arsip: jurnal tahun ajaran lama tidak dapat diubah.'); return; }
             const item = daftarJurnal.find(x => x.id === id);
             if (!item) return;
 
@@ -554,6 +630,7 @@
         }
 
         async function hapusJurnal(id) {
+            if (isArsipJurnal()) { alert('Mode arsip: jurnal tahun ajaran lama tidak dapat dihapus.'); return; }
             if (!confirm('Hapus catatan jurnal mengajar ini?')) return;
             const { error } = await sb.from('jurnal_mengajar').delete().eq('id', id);
             if (error) {
@@ -576,14 +653,14 @@
                 ? `<div class="kop-wrap text-center mb-3"><img src="${esc(profilSekolah.img_kop)}" class="kop-img max-h-24 mx-auto object-contain"></div>`
                 : `<div class="kop-wrap"><div class="kop-text"><h2>${esc(profilSekolah.nama)}</h2><p>NPSN: ${esc(profilSekolah.npsn || '-')}</p></div></div>`;
 
-            document.getElementById('lap-subjudul').innerText = `Periode: ${namaPeriode} | Tahun Pelajaran ${profilSekolah.tahun_ajaran}`;
+            document.getElementById('lap-subjudul').innerText = `Periode: ${namaPeriode} | Tahun Pelajaran ${taJurnal} (${semesterJurnal})`;
 
             // Identitas Guru
             document.getElementById('lap-guru-nama').innerText = profilGuru.nama;
             document.getElementById('lap-guru-nip').innerText = profilGuru.username;
             document.getElementById('lap-guru-pangkat').innerText = `${profilGuru.pangkat || '-'} / ${profilGuru.gol || '-'}`;
-            document.getElementById('lap-ta').innerText = profilSekolah.tahun_ajaran;
-            document.getElementById('lap-semester').innerText = profilSekolah.semester;
+            document.getElementById('lap-ta').innerText = taJurnal;
+            document.getElementById('lap-semester').innerText = semesterJurnal;
             document.getElementById('lap-mapel').innerText = profilGuru.mapel || '-';
 
             // Filter data jurnal
@@ -606,7 +683,9 @@
                 tbody.innerHTML = '';
                 dataFiltered.forEach((j, idx) => {
                     const namaKelas = j.rombel ? j.rombel.nama : '-';
-                    const gabungKegiatan = [esc(j.kegiatan), j.kehadiran_ringkas ? `<i>(${esc(j.kehadiran_ringkas)})</i>` : ''].filter(Boolean).join('<br>');
+                    const kehadiranHTML = j.kehadiran_ringkas
+                        ? `<div style="white-space:pre-line">${esc(j.kehadiran_ringkas)}</div>` : '';
+                    const gabungKegiatan = [j.kegiatan ? esc(j.kegiatan) : '', kehadiranHTML].filter(Boolean).join('<br>');
 
                     tbody.innerHTML += `
                         <tr class="align-top">
@@ -665,12 +744,12 @@
         }
 
         function exportLaporanWord() {
-            CC.exportWord(document.getElementById('area-cetak-jurnal').innerHTML,
+            CC.exportWord('area-cetak-jurnal',
                 `Jurnal_Mengajar_${new Date().toISOString().slice(0, 10)}`);
         }
 
         function exportLaporanExcel() {
-            CC.exportExcel(document.getElementById('area-cetak-jurnal').innerHTML,
+            CC.exportExcel('area-cetak-jurnal',
                 `Jurnal_Mengajar_${new Date().toISOString().slice(0, 10)}`);
         }
 

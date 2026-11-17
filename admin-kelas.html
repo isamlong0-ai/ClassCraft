@@ -438,10 +438,6 @@
             const hanyaAktif = document.getElementById('filter-aktif').checked;
             const daftar = hanyaAktif ? rombel.siswa.filter(s => (s.status || 'aktif') === 'aktif') : rombel.siswa;
 
-            const kop = dbSekolah.imgKop
-                ? `<div class="kop-wrap text-center"><img src="${dbSekolah.imgKop}" class="kop-img"></div>`
-                : `<div class="kop-wrap"><div class="kop-text"><h2>${escapeHtml(dbSekolah.nama)}</h2><p>NPSN: ${escapeHtml(dbSekolah.npsn || '-')}</p></div></div>`;
-
             let rows = '';
             daftar.forEach((s, idx) => {
                 rows += `<tr>
@@ -456,7 +452,6 @@
             });
 
             const content = `
-                ${kop}
                 <h3>DAFTAR SISWA KELAS ${escapeHtml(rombel.nama)}${rombel.tahun_ajaran ? ' — ' + escapeHtml(rombel.tahun_ajaran) : ''}</h3>
                 <table class="border">
                     <thead><tr><th>No</th><th>NISN</th><th>NIPD</th><th>Nama</th><th>JK</th><th>Status</th><th>Keterangan</th></tr></thead>

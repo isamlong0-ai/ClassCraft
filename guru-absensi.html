@@ -602,8 +602,7 @@
         }
 
         function exportRekapExcel() {
-            const html = document.getElementById('area-cetak-rekap').innerHTML;
-            CC.exportExcel(html, `Rekap_Presensi_${new Date().toISOString().slice(0, 10)}`);
+            CC.exportExcel('area-cetak-rekap', `Rekap_Presensi_${new Date().toISOString().slice(0, 10)}`);
         }
 
         function cetakRekap() {
